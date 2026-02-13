@@ -2,12 +2,11 @@ class ImportCompaniesJob < ApplicationJob
   queue_as :default
 
   def perform
-    client = JquantsClient.new
-    data = client.listed_companies
+    client = Jquants::Client.new
+    companies_data = client.listed_companies
 
-    return unless data && data["info"]
+    return unless companies_data
 
-    companies_data = data["info"]
     imported_count = 0
     updated_count = 0
 

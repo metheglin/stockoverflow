@@ -5,12 +5,11 @@ class ImportFinancialStatementsJob < ApplicationJob
   # @param code [String] Optional stock code to limit to specific company
   # @param date [String] Optional date (YYYY-MM-DD)
   def perform(code: nil, date: nil)
-    client = JquantsClient.new
-    data = client.financial_statements(code: code, date: date)
+    client = Jquants::Client.new
+    statements_data = client.financial_summary(code: code, date: date)
 
-    return unless data && data["statements"]
+    return unless statements_data
 
-    statements_data = data["statements"]
     imported_count = 0
     updated_count = 0
 

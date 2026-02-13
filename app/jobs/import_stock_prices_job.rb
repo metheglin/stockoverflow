@@ -6,12 +6,11 @@ class ImportStockPricesJob < ApplicationJob
   # @param to [String] End date (YYYY-MM-DD)
   # @param code [String] Optional stock code to limit to specific company
   def perform(from:, to:, code: nil)
-    client = JquantsClient.new
-    data = client.stock_prices(from: from, to: to, code: code)
+    client = Jquants::Client.new
+    prices_data = client.daily_prices(from: from, to: to, code: code)
 
-    return unless data && data["daily_quotes"]
+    return unless prices_data
 
-    prices_data = data["daily_quotes"]
     imported_count = 0
     updated_count = 0
 

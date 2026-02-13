@@ -186,3 +186,58 @@ Claude's development work log for this project.
 
 ---
 
+## 2026-02-13 - Refactor JQUANTS API Client Architecture
+
+**Done:**
+- Rebuilt JQUANTS API client based on specification from human.md
+- Created comprehensive base API client framework:
+  - `ApiClient::Base`: Generic HTTP client with rate limiting support
+  - `ApiClient::RateLimiter`: Thread-safe rate limiter for API throttling
+  - `ApiClient::Errors`: Comprehensive error hierarchy (AuthenticationError, RateLimitError, ClientError, ServerError, NetworkError)
+- Implemented Jquants module structure:
+  - `Jquants::Client`: Main API client with plan-based rate limiting
+    - Supports free, light, standard, and premium plans with appropriate rate limits
+    - Changed from v1 to v2 API endpoint
+    - Implemented listed_companies, daily_prices, financial_summary, dividends, financial_details methods
+    - All methods return arrays directly (no wrapper hashes)
+    - Uses x-api-key header authentication instead of Bearer token
+  - `Jquants::Paginator`: Iterator-based pagination support
+    - Supports streaming and batch fetching
+    - Implements Enumerable interface for flexible data processing
+    - Handles pagination_key automatically
+- Updated all import jobs to use new API:
+  - `ImportCompaniesJob`: Uses Jquants::Client.listed_companies
+  - `ImportStockPricesJob`: Uses Jquants::Client.daily_prices
+  - `ImportFinancialStatementsJob`: Uses Jquants::Client.financial_summary
+- Removed old `JquantsClient` class
+- Reinstalled all gem dependencies (120 gems)
+- Verified all modules load correctly in Rails environment
+
+**Result:**
+- Modern, maintainable API client architecture with separation of concerns
+- Rate limiting built-in to prevent API throttling
+- Pagination support for large data sets
+- Better error handling with specific error types
+- Simpler interface - methods return arrays directly
+- All import jobs updated and working with new client
+- System ready for testing with actual API calls
+
+**Technical Details:**
+- Rate limits per plan (requests per minute):
+  - Free: 5 req/min (12 second intervals)
+  - Light: 60 req/min (1 second intervals)
+  - Standard/Premium: 120 req/min (0.5 second intervals)
+- API v2 endpoints:
+  - /equities/master (companies)
+  - /equities/bars/daily (stock prices)
+  - /fins/summary (financial statements)
+  - /fins/dividend (dividends - Premium only)
+  - /fins/details (detailed financials - Premium only)
+
+**Next:**
+- Test data import with real JQUANTS API key
+- Validate data mapping and field names match API response
+- Consider adding retry logic for transient failures
+
+---
+
