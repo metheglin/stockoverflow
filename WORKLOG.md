@@ -288,3 +288,74 @@ Fixed URL path construction by:
 
 ---
 
+## 2026-02-13 - Fixed Import Job Field Mappings for JQUANTS API v2
+
+**Problem:**
+The ImportCompaniesJob, ImportStockPricesJob, and ImportFinancialStatementsJob were using incorrect field names that didn't match the actual JQUANTS API v2 response format. The API responses use abbreviated field names (e.g., "CoName", "O", "H", "L", "C", "Sales", "OP") but the jobs were trying to access full field names (e.g., "CompanyName", "Open", "High", "NetSales", "OperatingIncome") which don't exist in the API response.
+
+**Root Cause Analysis:**
+The field mapping issue stemmed from incorrect assumptions about the JQUANTS API v2 response structure:
+1. Company data fields: Expected "CompanyName" but API returns "CoName"; expected "MarketCode" but API returns "MktNm", etc.
+2. Stock price fields: Expected "Open", "High", "Low", "Close", "Volume", "AdjustmentClose" but API returns abbreviated forms "O", "H", "L", "C", "Vo", "AdjC"
+3. Financial statement fields: Expected "NetSales", "OperatingIncome", "OrdinaryIncome", "NetIncome", "TotalAssets", "Equity" but API returns "Sales", "OP", "OdP", "NP", "TA", "Eq"
+
+**Solution:**
+Fixed all three import jobs by updating field mappings to match actual JQUANTS API v2 response format:
+
+1. **ImportCompaniesJob** (app/jobs/import_companies_job.rb:26-29):
+   - "CompanyName" → "CoName" (company name)
+   - "MarketCode" → "MktNm" (market name)
+   - "33SectorName" → "S33Nm" (33-sector classification name)
+   - "17SectorName" → "S17Nm" (17-sector classification name)
+
+2. **ImportStockPricesJob** (app/jobs/import_stock_prices_job.rb:33-39):
+   - "Open" → "O" (open price)
+   - "High" → "H" (high price)
+   - "Low" → "L" (low price)
+   - "Close" → "C" (close price)
+   - "Volume" → "Vo" (volume before adjustment)
+   - "AdjustmentClose" → "AdjC" (adjusted close price)
+
+3. **ImportFinancialStatementsJob** (app/jobs/import_financial_statements_job.rb:23-52):
+   - "TypeOfDocument" → "DocType" (document type)
+   - "FiscalYear" + "FiscalPeriod" → Extract from "CurPerType" and "CurFYEn"
+   - "NetSales" → "Sales" (net sales)
+   - "OperatingIncome" → "OP" (operating profit)
+   - "OrdinaryIncome" → "OdP" (ordinary profit)
+   - "NetIncome" → "NP" (net profit)
+   - "TotalAssets" → "TA" (total assets)
+   - "Equity" → "Eq" (equity)
+   - "CashFlowsFromOperatingActivities" → "CFO" (cash flow from operations)
+   - "CashFlowsFromInvestingActivities" → "CFI" (cash flow from investing)
+   - "CashFlowsFromFinancingActivities" → "CFF" (cash flow from financing)
+   - "IssuedShareNumber" → "ShOutFY" (shares outstanding)
+   - "DisclosedDate" → "DiscDate" (disclosure date)
+
+**Testing:**
+- Reinstalled all gem dependencies (120 gems) successfully
+- Verified all import jobs load without syntax errors
+- Created and ran test_api_fields.rb script to validate field mappings with sample data
+- Confirmed all three import jobs now correctly reference the actual API v2 field names
+
+**Files Modified:**
+- app/jobs/import_companies_job.rb: Updated company data field mapping
+- app/jobs/import_stock_prices_job.rb: Updated stock price field mapping
+- app/jobs/import_financial_statements_job.rb: Updated financial statement field mapping
+
+**Reference Documentation:**
+- JQUANTS API v2 Stock Prices endpoint: https://jpx-jquants.com/en/spec/eq-bars-daily
+- JQUANTS API v2 Financial Summary endpoint: https://jpx-jquants.com/en/spec/fin-summary
+
+**Result:**
+- All import jobs now use correct field names matching JQUANTS API v2 responses
+- Data import should now work correctly when executed with valid API credentials
+- Field mappings verified against official JQUANTS API v2 documentation
+- System ready for production data import from JQUANTS API
+
+**Next Steps:**
+- Test actual data import with real JQUANTS API credentials
+- Verify data is correctly stored in database tables
+- Run full data import workflow and calculate metrics
+
+---
+

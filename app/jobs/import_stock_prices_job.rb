@@ -31,12 +31,12 @@ class ImportStockPricesJob < ApplicationJob
       end
 
       stock_price.update!(
-        open_price: price_data["Open"],
-        high_price: price_data["High"],
-        low_price: price_data["Low"],
-        close_price: price_data["Close"],
-        volume: price_data["Volume"],
-        adjusted_close: price_data["AdjustmentClose"]
+        open_price: price_data["O"],
+        high_price: price_data["H"],
+        low_price: price_data["L"],
+        close_price: price_data["C"],
+        volume: price_data["Vo"],
+        adjusted_close: price_data["AdjC"]
       )
     end
 

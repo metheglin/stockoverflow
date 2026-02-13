@@ -20,9 +20,11 @@ class ImportFinancialStatementsJob < ApplicationJob
       company = Company.find_by(code: stock_code)
       next unless company
 
-      # Extract fiscal year and period
-      fiscal_year = statement_data["FiscalYear"]
-      fiscal_period = statement_data["FiscalPeriod"]
+      # Extract fiscal year and period information
+      # Use CurPerType (1Q, 2Q, 3Q, 4Q, FY) as fiscal_period
+      fiscal_period = statement_data["CurPerType"]
+      # Extract fiscal year from CurFYEn (e.g., "2024-03-31" -> 2024)
+      fiscal_year = statement_data["CurFYEn"] ? Date.parse(statement_data["CurFYEn"]).year : nil
       next unless fiscal_year && fiscal_period
 
       statement = FinancialStatement.find_or_initialize_by(
@@ -38,18 +40,18 @@ class ImportFinancialStatementsJob < ApplicationJob
       end
 
       statement.update!(
-        report_type: statement_data["TypeOfDocument"],
-        net_sales: statement_data["NetSales"],
-        operating_income: statement_data["OperatingIncome"],
-        ordinary_income: statement_data["OrdinaryIncome"],
-        net_income: statement_data["NetIncome"],
-        total_assets: statement_data["TotalAssets"],
-        total_equity: statement_data["Equity"],
-        operating_cash_flow: statement_data["CashFlowsFromOperatingActivities"],
-        investing_cash_flow: statement_data["CashFlowsFromInvestingActivities"],
-        financing_cash_flow: statement_data["CashFlowsFromFinancingActivities"],
-        shares_outstanding: statement_data["IssuedShareNumber"],
-        filed_date: statement_data["DisclosedDate"] ? Date.parse(statement_data["DisclosedDate"]) : nil
+        report_type: statement_data["DocType"],
+        net_sales: statement_data["Sales"],
+        operating_income: statement_data["OP"],
+        ordinary_income: statement_data["OdP"],
+        net_income: statement_data["NP"],
+        total_assets: statement_data["TA"],
+        total_equity: statement_data["Eq"],
+        operating_cash_flow: statement_data["CFO"],
+        investing_cash_flow: statement_data["CFI"],
+        financing_cash_flow: statement_data["CFF"],
+        shares_outstanding: statement_data["ShOutFY"],
+        filed_date: statement_data["DiscDate"] ? Date.parse(statement_data["DiscDate"]) : nil
       )
     end
 

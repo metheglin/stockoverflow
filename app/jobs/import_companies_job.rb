@@ -23,10 +23,10 @@ class ImportCompaniesJob < ApplicationJob
       end
 
       company.update!(
-        name: company_data["CompanyName"],
-        market: company_data["MarketCode"],
-        industry: company_data["33SectorName"],
-        sector: company_data["17SectorName"]
+        name: company_data["CoName"],
+        market: company_data["MktNm"],
+        industry: company_data["S33Nm"],
+        sector: company_data["S17Nm"]
       )
     end
 
