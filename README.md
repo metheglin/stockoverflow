@@ -88,35 +88,131 @@ calculator.calculate_all_metrics(fiscal_year: 2024, fiscal_period: "Q4")
 CalculateMetricsJob.calculate_all
 ```
 
+## Quick Start
+
+### 1. Import Data
+
+```bash
+# Import all data (companies, statements, and prices)
+bundle exec rake stock_data:refresh_all
+
+# Or import step by step
+bundle exec rake stock_data:import_companies
+bundle exec rake stock_data:import_statements
+bundle exec rake stock_data:import_prices[2024-01-01,2024-12-31]
+bundle exec rake stock_data:calculate_metrics
+```
+
+### 2. Run Analysis
+
+```bash
+# Find companies with 6 consecutive periods of growth
+bundle exec rake analysis:consecutive_growth[6]
+
+# Find companies with positive OCF-ICF gap
+bundle exec rake analysis:ocf_icf_gap
+
+# Analyze specific company
+bundle exec rake analysis:historical_metrics[7203]
+
+# Show database summary
+bundle exec rake analysis:summary
+```
+
 ## Use Cases
 
-### Find Companies with Consecutive Revenue/Profit Growth
-```ruby
-# Companies with 6 consecutive periods of revenue growth
-companies = Company.joins(:growth_metrics)
-  .group("companies.id")
-  .having("COUNT(CASE WHEN growth_metrics.revenue_growth_rate > 0 THEN 1 END) >= 6")
-  .order("AVG(growth_metrics.revenue_growth_rate) DESC")
+### Use Case 1: Find Companies with Consecutive Revenue/Profit Growth
+
+```bash
+# Using rake task
+bundle exec rake analysis:consecutive_growth[6]
 ```
 
-### Find Companies with Positive OCF and Negative ICF
 ```ruby
-# Companies with OCF+ and ICF- and positive gap
-companies = Company.joins(:cash_flow_metrics)
-  .joins(:financial_statements)
-  .where("financial_statements.operating_cash_flow > 0")
-  .where("financial_statements.investing_cash_flow < 0")
-  .where("cash_flow_metrics.ocf_icf_gap > 0")
+# Using model scopes
+companies = Company.with_consecutive_revenue_growth(6)
+
+# Using analyzer service
+companies = CompanyAnalyzer.find_consecutive_growth_companies(
+  revenue_periods: 6,
+  profit_periods: 6
+)
 ```
 
-### Analyze Historical Metrics Before Breakthrough
+### Use Case 2: Find Companies with Positive OCF and Negative ICF
+
+```bash
+# Using rake task
+bundle exec rake analysis:ocf_icf_gap
+```
+
 ```ruby
-# Get historical profitability metrics for a company
+# Using model scopes
+companies = Company.with_positive_ocf_negative_icf
+                   .with_positive_ocf_icf_gap
+
+# Using analyzer service
+companies = CompanyAnalyzer.find_cash_flow_positive_companies
+turnaround = CompanyAnalyzer.find_gap_turnaround_companies(periods: 4)
+```
+
+### Use Case 3: Analyze Historical Metrics Before Breakthrough
+
+```bash
+# Using rake task
+bundle exec rake analysis:historical_metrics[7203]
+```
+
+```ruby
+# Using analyzer service
 company = Company.find_by(code: "7203")
-metrics = company.profitability_metrics.order(fiscal_year: :asc)
+analysis = CompanyAnalyzer.analyze_breakthrough_precursors(
+  company,
+  breakthrough_year: 2024,
+  breakthrough_period: "Q4",
+  lookback_periods: 8
+)
+```
 
-# Analyze growth trajectory
-growth_history = company.growth_metrics.order(fiscal_year: :asc)
+## Additional Features
+
+### Query Scopes
+
+```ruby
+# High ROE companies
+Company.high_roe(15)
+
+# By industry
+Company.by_industry("自動車・輸送機")
+
+# By market
+Company.by_market("Prime")
+
+# Consecutive growth
+Company.with_consecutive_revenue_growth(6)
+Company.with_consecutive_profit_growth(6)
+```
+
+### Company Instance Methods
+
+```ruby
+company = Company.find_by(code: "7203")
+
+# Latest data
+company.latest_financial_statement
+company.latest_stock_price
+
+# Trends
+company.growth_trend(periods: 4)
+company.profitability_trend(periods: 4)
+company.cash_flow_trend(periods: 4)
+
+# Checks
+company.consecutive_revenue_growth?(periods: 6)
+company.consecutive_profit_growth?(periods: 6)
+
+# Summary
+company.metrics_summary
 ```
 
 ## API Clients
