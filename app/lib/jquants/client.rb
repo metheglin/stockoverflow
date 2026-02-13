@@ -1,6 +1,6 @@
 module Jquants
   class Client < ApiClient::Base
-    BASE_URL = "https://api.jquants.com/v2"
+    BASE_URL = "https://api.jquants.com/v2/"
 
     PLAN_INTERVALS = {
       free: 60.0 / 5,
@@ -24,7 +24,7 @@ module Jquants
       params = {}
       params[:code] = code if code
       params[:date] = format_date(date) if date
-      paginate("/equities/master", params: params).all
+      paginate("equities/master", params: params).all
     end
 
     # 日次株価
@@ -39,7 +39,7 @@ module Jquants
       params[:date] = format_date(date) if date
       params[:from] = format_date(from) if from
       params[:to] = format_date(to) if to
-      paginate("/equities/bars/daily", params: params).all
+      paginate("equities/bars/daily", params: params).all
     end
 
     # 財務サマリ（四半期決算）
@@ -50,7 +50,7 @@ module Jquants
       params = {}
       params[:code] = code if code
       params[:date] = format_date(date) if date
-      paginate("/fins/summary", params: params).all
+      paginate("fins/summary", params: params).all
     end
 
     # 配当情報（Premiumプラン）
@@ -61,7 +61,7 @@ module Jquants
       params = {}
       params[:code] = code if code
       params[:date] = format_date(date) if date
-      paginate("/fins/dividend", params: params).all
+      paginate("fins/dividend", params: params).all
     end
 
     # 財務明細 BS/PL/CF（Premiumプラン）
@@ -72,7 +72,7 @@ module Jquants
       params = {}
       params[:code] = code if code
       params[:date] = format_date(date) if date
-      paginate("/fins/details", params: params).all
+      paginate("fins/details", params: params).all
     end
 
     # Paginatorを返す（ページ単位のストリーミング用）

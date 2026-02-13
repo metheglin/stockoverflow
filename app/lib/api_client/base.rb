@@ -49,7 +49,9 @@ module ApiClient
 
         response = case method
                    when :get, :delete
-                     @connection.public_send(method, path, params, headers)
+                     @connection.public_send(method, path, params) do |req|
+                       req.headers.update(headers) if headers.any?
+                     end
                    when :post, :put
                      @connection.public_send(method, path, body) do |req|
                        req.headers.update(headers)

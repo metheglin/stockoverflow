@@ -241,3 +241,50 @@ Claude's development work log for this project.
 
 ---
 
+## 2026-02-13 - Fixed JQUANTS API Authentication Issue
+
+**Problem:**
+The JQUANTS API client was returning 403 authentication errors when attempting to fetch data, despite having a valid API key configured.
+
+**Root Cause Analysis:**
+The issue was caused by incorrect URL path construction in Faraday HTTP client:
+1. The BASE_URL was set to `https://api.jquants.com/v2` (without trailing slash)
+2. API methods were using absolute paths (e.g., `/equities/master`)
+3. When Faraday combines a base URL with an absolute path, it replaces the path component entirely
+4. Result: Requests were sent to `https://api.jquants.com/equities/master` instead of `https://api.jquants.com/v2/equities/master`
+5. The v2 API endpoints were missing the `/v2` prefix, causing 403 errors with "Missing Authentication Token" message
+
+**Solution:**
+Fixed URL path construction by:
+1. Added trailing slash to BASE_URL: `https://api.jquants.com/v2/`
+2. Changed all API paths from absolute to relative (removed leading `/`):
+   - `/equities/master` → `equities/master`
+   - `/equities/bars/daily` → `equities/bars/daily`
+   - `/fins/summary` → `fins/summary`
+   - `/fins/dividend` → `fins/dividend`
+   - `/fins/details` → `fins/details`
+3. Fixed header passing in `ApiClient::Base#request` method to use block style for GET/DELETE requests
+
+**Testing:**
+- Created test scripts to verify API authentication
+- Successfully tested `listed_companies` endpoint with both specific company code (7203 - Toyota) and full company list
+- Confirmed API returns data in expected format with `{"data": [...]}` structure
+- Verified field names: `Code`, `CoName`, `CoNameEn`, `S17`, `S33`, `Mkt`, etc.
+
+**Files Modified:**
+- `app/lib/api_client/base.rb`: Fixed header passing for GET/DELETE requests
+- `app/lib/jquants/client.rb`: Updated BASE_URL and all endpoint paths
+
+**Result:**
+- JQUANTS API authentication now works correctly
+- `listed_companies` endpoint successfully retrieves company data
+- System ready for data import from JQUANTS API
+- Rate limiting is properly configured (free plan: 5 req/min, 12 second intervals)
+
+**Next Steps:**
+- Test other endpoints (daily_prices, financial_summary)
+- Run full data import workflow
+- Validate data mapping with database schema
+
+---
+
