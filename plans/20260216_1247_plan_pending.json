@@ -1,0 +1,162 @@
+{
+  "summary": "Fix broken API clients (J-Quants and EDINET) so they actually work with real API keys, verify data retrieval with at least one test case each, set up the Rails environment (bundle install, db:create, db:migrate), create .env with proper API keys, and push working code.",
+  "steps": [
+    {
+      "id": 1,
+      "description": "Install dependencies and bootstrap the Rails environment",
+      "details": "Run `bundle install`, then `rails db:create` and `rails db:migrate` to set up the SQLite database. Verify the app can boot with `rails runner 'puts Rails.version'`.",
+      "files": ["Gemfile", "Gemfile.lock", "db/schema.rb"],
+      "acceptance_criteria": [
+        "bundle install succeeds",
+        "rails db:create and db:migrate complete without errors",
+        "rails runner confirms Rails 8.1+ is loaded"
+      ]
+    },
+    {
+      "id": 2,
+      "description": "Create .env file with API keys from CLAUDE.md",
+      "details": "Create a .env file with EDINET_API_KEY and JQUANTS_API_KEY values from the project config. The .gitignore already excludes .env* files.",
+      "files": [".env"],
+      "acceptance_criteria": [
+        ".env file exists with both API keys",
+        "dotenv-rails loads keys into ENV"
+      ]
+    },
+    {
+      "id": 3,
+      "description": "Fix J-Quants Client: authentication uses x-api-key header, not Bearer token; update V2 endpoints",
+      "details": "The current Jquants::Client has two critical bugs:\n\n1. **Authentication**: It sends `Authorization: Bearer <api_key>` but J-Quants V2 uses `x-api-key` header. The JQUANTS_API_KEY provided in config is a direct API key, not an OAuth token. Fix the `get` method to use `x-api-key` header instead.\n\n2. **Endpoint paths**: The code uses V1 endpoint paths (e.g., `listed/info`, `prices/daily_quotes`, `fins/statements`) but the J-Quants V2 API changed paths:\n   - `listed/info` → `equities/master`\n   - `prices/daily_quotes` → `equities/bars/daily`\n   - `fins/statements` → `fins/summary`\n\n3. **Response format**: V2 returns data under the `data` key instead of specific keys like `info`, `daily_quotes`, `statements`. The Paginator needs updating.\n\n4. **Rate limiter**: The current limit is 5 requests per 60 seconds, which matches the Free plan (5/min). This is fine.",
+      "files": [
+        "app/lib/jquants/client.rb",
+        "app/lib/jquants/paginator.rb"
+      ],
+      "acceptance_criteria": [
+        "Jquants::Client uses x-api-key header instead of Authorization: Bearer",
+        "Endpoint paths match V2 API spec (equities/master, equities/bars/daily, fins/summary)",
+        "Paginator reads from 'data' key in response",
+        "A real API call to listed_companies returns data successfully"
+      ]
+    },
+    {
+      "id": 4,
+      "description": "Verify J-Quants Client works with a real API call",
+      "details": "Use rails runner or console to make a single API call: `Jquants::Client.new.listed_companies(code: '72030').first` (Toyota Motor). Confirm a valid response with company data is returned. If it fails, debug and fix until it works.",
+      "files": ["app/lib/jquants/client.rb"],
+      "acceptance_criteria": [
+        "Jquants::Client.new.listed_companies(code: '72030') returns at least one record",
+        "The returned data contains expected fields (Code, company name, etc.)",
+        "No authentication or 4xx errors"
+      ]
+    },
+    {
+      "id": 5,
+      "description": "Verify EDINET Client works with a real API call",
+      "details": "The EDINET client looks mostly correct (passes Subscription-Key as query param), but needs verification. Use rails runner to call `Edinet::Client.new.documents(date: '2026-02-14')` and confirm it returns data. The date should be a recent business day. If it fails, debug the response format and fix.",
+      "files": ["app/lib/edinet/client.rb"],
+      "acceptance_criteria": [
+        "Edinet::Client.new.documents(date: <recent_date>) returns a valid response",
+        "Response contains document metadata/listing",
+        "No authentication errors"
+      ]
+    },
+    {
+      "id": 6,
+      "description": "Update import jobs to match V2 response field names if needed",
+      "details": "After confirming the actual V2 response format from J-Quants, verify that the field mappings in ImportCompaniesJob, ImportStockPricesJob, and ImportFinancialStatementsJob still match. V2 may have changed field names (e.g., CoName may still be the same or changed). Update mappings if necessary based on actual API responses.",
+      "files": [
+        "app/jobs/import_companies_job.rb",
+        "app/jobs/import_stock_prices_job.rb",
+        "app/jobs/import_financial_statements_job.rb"
+      ],
+      "acceptance_criteria": [
+        "Job field mappings match actual V2 API response field names",
+        "ImportCompaniesJob.perform_now successfully imports at least one company",
+        "No key-not-found or nil errors during import"
+      ]
+    },
+    {
+      "id": 7,
+      "description": "Run end-to-end data import test for one company",
+      "details": "Execute ImportCompaniesJob to import at least company 7203 (Toyota), then run ImportFinancialStatementsJob(code: '72030') and ImportStockPricesJob(code: '72030') to verify the full pipeline. Confirm data is persisted in the database.",
+      "files": [
+        "app/jobs/import_companies_job.rb",
+        "app/jobs/import_stock_prices_job.rb",
+        "app/jobs/import_financial_statements_job.rb"
+      ],
+      "acceptance_criteria": [
+        "Company record exists in the database",
+        "At least some financial statements are imported",
+        "At least some stock prices are imported",
+        "MetricCalculator can run on the imported data"
+      ]
+    },
+    {
+      "id": 8,
+      "description": "Run existing test suite to ensure nothing is broken",
+      "details": "Run `rails test` to verify all 37 existing tests still pass after the API client changes.",
+      "files": ["test/**/*.rb"],
+      "acceptance_criteria": [
+        "All existing tests pass (37 runs, 0 failures, 0 errors)"
+      ]
+    },
+    {
+      "id": 9,
+      "description": "Update WORKLOG.md with progress",
+      "details": "Document what was fixed: the J-Quants authentication method (x-api-key vs Bearer), the V2 endpoint path changes, successful API verification results, and any other fixes applied.",
+      "files": ["WORKLOG.md"],
+      "acceptance_criteria": [
+        "WORKLOG.md contains a new dated entry describing the fixes",
+        "Entry includes what was broken and how it was fixed"
+      ]
+    },
+    {
+      "id": 10,
+      "description": "Commit and push changes",
+      "details": "Stage all changed files (excluding .env), commit with a descriptive message, and push to origin/main.",
+      "files": [],
+      "acceptance_criteria": [
+        "Changes are committed with a clear message",
+        ".env file is NOT committed (excluded by .gitignore)",
+        "Push to remote succeeds"
+      ]
+    }
+  ],
+  "risks": [
+    {
+      "risk": "J-Quants API key may be invalid or expired",
+      "mitigation": "The config provides what appears to be a valid API key. If it fails, we'll get a clear error message indicating the issue. We can only fix what's in our control (the client code).",
+      "severity": "medium"
+    },
+    {
+      "risk": "J-Quants V2 response field names may differ from what the import jobs expect",
+      "mitigation": "Step 6 explicitly verifies actual response field names and updates mappings. We'll inspect the real API response before updating jobs.",
+      "severity": "high"
+    },
+    {
+      "risk": "J-Quants Free plan rate limit (5 req/min) is very restrictive",
+      "mitigation": "The existing RateLimiter already handles this. For verification we only need a few requests. For bulk imports, the rate limiter will throttle appropriately.",
+      "severity": "low"
+    },
+    {
+      "risk": "EDINET API may have changed response format or require additional parameters",
+      "mitigation": "Step 5 tests with a real call. The EDINET API v2 spec was updated Jan 2026, so the current implementation should be close to correct.",
+      "severity": "low"
+    },
+    {
+      "risk": "Ruby 4.0 / Rails 8.1 compatibility issues with gems",
+      "mitigation": "The Gemfile.lock was previously generated successfully, so bundle install should work. If not, we'll update gem versions.",
+      "severity": "low"
+    },
+    {
+      "risk": "The J-Quants base URL may need to change from api.jquants.com to api.jquants-pro.com for V2",
+      "mitigation": "Migration docs mention both URLs. We'll test with the current URL first, and switch if authentication fails.",
+      "severity": "medium"
+    }
+  ],
+  "estimated_commits": 3,
+  "commit_plan": [
+    "Commit 1: Fix J-Quants client (auth header, V2 endpoints, response format) and verify API connectivity",
+    "Commit 2: Fix EDINET client if needed, update import job field mappings, verify end-to-end pipeline",
+    "Commit 3: Update WORKLOG.md and final cleanup"
+  ]
+}
