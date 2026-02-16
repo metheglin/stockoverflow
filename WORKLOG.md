@@ -4,6 +4,59 @@ Claude's development work log for this project.
 
 ---
 
+## 2026-02-16: Fix API Clients - J-Quants V2 Migration & Verification
+
+### Summary
+Fixed broken J-Quants API client to work with V2 API (released Dec 2025), verified both J-Quants and EDINET clients with real API calls, and confirmed the full data import pipeline works end-to-end.
+
+### What was broken
+
+**J-Quants Client had three critical issues:**
+
+1. **Authentication method**: The client used `Authorization: Bearer <api_key>` header, but J-Quants V2 (released Dec 22, 2025) uses `x-api-key` header with a direct API key. The V1 API required a complex multi-step OAuth flow (email/password → refresh token → ID token), but V2 simplified this to a single API key header.
+
+2. **Endpoint paths**: The client used V1 paths but had the V2 base URL:
+   - `listed/info` → `equities/master`
+   - `prices/daily_quotes` → `equities/bars/daily`
+   - `fins/statements` → `fins/summary`
+
+3. **Response data key**: V1 returned data under endpoint-specific keys (`info`, `daily_quotes`, `statements`), but V2 standardized all responses to use `"data"` as the universal key.
+
+**ApiClient::Base had a Faraday configuration bug:**
+- `conn.response :raise_error, false` caused a `TypeError: no implicit conversion of false into Hash` because the Faraday `raise_error` middleware doesn't accept a boolean argument.
+
+### What was fixed
+
+- `app/lib/jquants/client.rb`: Changed auth from `Authorization: Bearer` to `x-api-key` header; updated V2 endpoint paths; simplified paginator call (no per-endpoint data key)
+- `app/lib/jquants/paginator.rb`: Changed from dynamic `data_key` parameter to universal `"data"` constant for V2 responses
+- `app/lib/api_client/base.rb`: Removed broken `raise_error` middleware config; replaced with optional debug logger
+
+### Verification Results
+
+**J-Quants API (all verified with real API calls):**
+- `equities/master` (code: 72030) → Toyota Motor Corporation data returned ✓
+- `equities/bars/daily` (code: 72030, Nov 2025) → 14 daily price records returned ✓
+- `fins/summary` (code: 72030) → 8 financial statement records returned ✓
+- V2 field names match import job mappings (CoName, MktNm, S33Nm, O/H/L/C/Vo/AdjC, Sales/OP/NP/TA/Eq/CFO/CFI/CFF) ✓
+- Note: Subscription date range is 2023-11-24 to 2025-11-24 (Free plan)
+
+**EDINET API (verified with real API call):**
+- `documents.json` (date: 2026-02-13) → 627 document records returned ✓
+- No changes needed; client was working correctly
+
+**End-to-end pipeline (Toyota 72030):**
+- ImportCompaniesJob: 1 company imported ✓
+- ImportFinancialStatementsJob: 8 statements imported ✓
+- ImportStockPricesJob: 14 price records imported ✓
+- MetricCalculator: profitability/growth/valuation/cash flow metrics calculated ✓
+
+### Test Results
+```
+37 runs, 81 assertions, 0 failures, 0 errors, 0 skips
+```
+
+---
+
 ## 2026-02-16: Full Rails Application Setup Complete
 
 ### Summary

@@ -63,7 +63,7 @@ module ApiClient
       Faraday.new(url: @base_url) do |conn|
         conn.request :retry, max: 3, interval: 1, backoff_factor: 2,
           exceptions: [Faraday::TimeoutError, Faraday::ConnectionFailed]
-        conn.response :raise_error, false
+        conn.response :logger, nil, { headers: false, bodies: false } if ENV["API_DEBUG"]
         conn.adapter Faraday.default_adapter
       end
     end

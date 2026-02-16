@@ -12,7 +12,7 @@ module Jquants
     def listed_companies(code: nil)
       params = {}
       params[:code] = code if code
-      paginate("listed/info", params, "info")
+      paginate("equities/master", params)
     end
 
     # Fetch daily stock prices
@@ -21,25 +21,26 @@ module Jquants
       params[:code] = code if code
       params[:from] = from if from
       params[:to] = to if to
-      paginate("prices/daily_quotes", params, "daily_quotes")
+      paginate("equities/bars/daily", params)
     end
 
     # Fetch financial statement summaries
-    def fins_statements(code: nil)
+    def fins_statements(code: nil, date: nil)
       params = {}
       params[:code] = code if code
-      paginate("fins/statements", params, "statements")
+      params[:date] = date if date
+      paginate("fins/summary", params)
     end
 
     private
 
     def get(path, params = {}, headers = {})
-      headers["Authorization"] = "Bearer #{@api_key}"
+      headers["x-api-key"] = @api_key
       super(path, params, headers)
     end
 
-    def paginate(path, params, data_key)
-      Paginator.new(self, path, params, data_key)
+    def paginate(path, params)
+      Paginator.new(self, path, params)
     end
   end
 end

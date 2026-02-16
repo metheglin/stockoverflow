@@ -2,11 +2,12 @@ module Jquants
   class Paginator
     include Enumerable
 
-    def initialize(client, path, params, data_key)
+    DATA_KEY = "data"
+
+    def initialize(client, path, params)
       @client = client
       @path = path
       @params = params
-      @data_key = data_key
     end
 
     def each(&block)
@@ -17,7 +18,7 @@ module Jquants
         params[:pagination_key] = pagination_key if pagination_key
 
         response = @client.send(:get, @path, params)
-        records = response[@data_key] || []
+        records = response[DATA_KEY] || []
         records.each(&block)
 
         pagination_key = response["pagination_key"]
