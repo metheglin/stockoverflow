@@ -1,0 +1,207 @@
+{
+  "summary": "Set up Rails 8 application with SQLite for Japanese listed company financial analysis. Generate full Rails directory structure, configure DB schema with master data tables and derived metrics tables, implement EDINET/JQUANTS API clients, data import jobs, metric calculation framework, and analysis use cases. The project reuses learnings from a previous attempt (in git history) but rebuilds from scratch with improvements.",
+  "steps": [
+    {
+      "step": 1,
+      "description": "Generate Rails application structure and install dependencies",
+      "details": "Run `bundle install` to install gems, then `rails new . --database=sqlite3 --skip-bundle --force` to generate the Rails directory structure into the existing project (preserving Gemfile). Run `bundle install` again, then `rails db:create` to verify SQLite works. Create .env file with EDINET_API_KEY and JQUANTS_API_KEY from config.",
+      "files": [
+        "app/", "config/", "db/", "bin/", "public/", ".env"
+      ],
+      "acceptance_criteria": [
+        "Rails directory structure exists (app/, config/, db/, bin/, etc.)",
+        "bundle install succeeds without errors",
+        "rails db:create succeeds",
+        ".env file contains API keys (excluded from git via .gitignore)"
+      ]
+    },
+    {
+      "step": 2,
+      "description": "Create database schema with migrations for master data tables",
+      "details": "Create migrations for: companies (code, name, market, industry, sector, listing_date), financial_statements (company_id, fiscal_year, fiscal_period, report_type, net_sales, operating_income, ordinary_income, net_income, total_assets, total_equity, operating_cash_flow, investing_cash_flow, financing_cash_flow, shares_outstanding, filed_date), stock_prices (company_id, date, open_price, high_price, low_price, close_price, adjusted_close, volume). Add appropriate indexes and foreign keys.",
+      "files": [
+        "db/migrate/*_create_companies.rb",
+        "db/migrate/*_create_financial_statements.rb",
+        "db/migrate/*_create_stock_prices.rb"
+      ],
+      "acceptance_criteria": [
+        "rails db:migrate succeeds",
+        "companies table has unique index on code",
+        "financial_statements has unique composite index on (company_id, fiscal_year, fiscal_period)",
+        "stock_prices has unique composite index on (company_id, date)",
+        "Foreign keys properly reference companies table"
+      ]
+    },
+    {
+      "step": 3,
+      "description": "Create database schema for derived metrics tables",
+      "details": "Create migrations for: growth_metrics (company_id, fiscal_year, fiscal_period, revenue_growth_rate, operating_income_growth_rate, net_income_growth_rate, eps_growth_rate, total_assets_growth_rate), profitability_metrics (company_id, fiscal_year, fiscal_period, roe, roa, operating_margin, net_margin, gross_margin), valuation_metrics (company_id, date, per, pbr, psr, pcfr, dividend_yield, market_cap), cash_flow_metrics (company_id, fiscal_year, fiscal_period, free_cash_flow, ocf_to_sales, ocf_icf_gap, cash_conversion_cycle). All with appropriate indexes and foreign keys.",
+      "files": [
+        "db/migrate/*_create_growth_metrics.rb",
+        "db/migrate/*_create_profitability_metrics.rb",
+        "db/migrate/*_create_valuation_metrics.rb",
+        "db/migrate/*_create_cash_flow_metrics.rb"
+      ],
+      "acceptance_criteria": [
+        "rails db:migrate succeeds for all metric tables",
+        "Each metric table has unique composite index for deduplication",
+        "Foreign keys reference companies table"
+      ]
+    },
+    {
+      "step": 4,
+      "description": "Implement ActiveRecord models with associations and validations",
+      "details": "Create models for Company, FinancialStatement, StockPrice, GrowthMetric, ProfitabilityMetric, ValuationMetric, CashFlowMetric. Company has_many of each. Each belongs_to :company. Add appropriate validations (presence, uniqueness with scope). Add useful scopes to Company model for filtering by market, industry, etc.",
+      "files": [
+        "app/models/company.rb",
+        "app/models/financial_statement.rb",
+        "app/models/stock_price.rb",
+        "app/models/growth_metric.rb",
+        "app/models/profitability_metric.rb",
+        "app/models/valuation_metric.rb",
+        "app/models/cash_flow_metric.rb"
+      ],
+      "acceptance_criteria": [
+        "All models load without errors",
+        "Associations work correctly (Company.first.financial_statements, etc.)",
+        "Validations prevent duplicate records"
+      ]
+    },
+    {
+      "step": 5,
+      "description": "Implement API client libraries in app/lib",
+      "details": "Create ApiClient::Base (generic HTTP client with Faraday, rate limiting, error handling), ApiClient::RateLimiter (thread-safe rate limiter), ApiClient::Errors (error hierarchy). Create Jquants::Client extending ApiClient::Base for J-Quants API v2 (x-api-key auth, endpoints: equities/master, equities/bars/daily, fins/summary, fins/details, fins/dividend). Create Jquants::Paginator for handling pagination_key. Create Edinet::Client for EDINET API v2 (Subscription-Key param, endpoints: documents.json, documents/{docId}). Ensure app/lib is autoloaded in Rails.",
+      "files": [
+        "app/lib/api_client/base.rb",
+        "app/lib/api_client/rate_limiter.rb",
+        "app/lib/api_client/errors.rb",
+        "app/lib/jquants/client.rb",
+        "app/lib/jquants/paginator.rb",
+        "app/lib/edinet/client.rb",
+        "config/application.rb (autoload path)"
+      ],
+      "acceptance_criteria": [
+        "Jquants::Client can be instantiated with API key from ENV",
+        "Edinet::Client can be instantiated with API key from ENV",
+        "Rate limiting works correctly",
+        "Error handling covers 401, 403, 429, 4xx, 5xx responses",
+        "Pagination handles pagination_key for multi-page results"
+      ]
+    },
+    {
+      "step": 6,
+      "description": "Implement data import jobs",
+      "details": "Create ImportCompaniesJob (fetches listed companies from J-Quants, upserts Company records). Create ImportStockPricesJob (fetches daily OHLC from J-Quants by code/date range, upserts StockPrice records). Create ImportFinancialStatementsJob (fetches financial summaries from J-Quants, upserts FinancialStatement records). Use correct J-Quants v2 field mappings (CoName, MktNm, S33Nm, S17Nm for companies; O, H, L, C, Vo, AdjC for prices; Sales, OP, OdP, NP, TA, Eq, CFO, CFI, CFF for financials). All jobs should be runnable from rails console.",
+      "files": [
+        "app/jobs/import_companies_job.rb",
+        "app/jobs/import_stock_prices_job.rb",
+        "app/jobs/import_financial_statements_job.rb"
+      ],
+      "acceptance_criteria": [
+        "ImportCompaniesJob.perform_now imports companies from J-Quants API",
+        "ImportStockPricesJob.perform_now(code: '7203') imports stock prices for Toyota",
+        "ImportFinancialStatementsJob.perform_now imports financial data",
+        "Jobs are idempotent (running twice doesn't create duplicates)"
+      ]
+    },
+    {
+      "step": 7,
+      "description": "Implement metric calculation framework",
+      "details": "Create CalculateMetricsJob that calculates derived metrics for a company: ProfitabilityMetrics (ROE, ROA, operating_margin, net_margin from FinancialStatement), GrowthMetrics (YoY growth rates by comparing consecutive fiscal years), CashFlowMetrics (free_cash_flow, ocf_to_sales, ocf_icf_gap), ValuationMetrics (PER, PBR, PSR, PCFR from stock prices + financial data). The calculation should be extensible for future metrics. Consider creating a MetricCalculator service class.",
+      "files": [
+        "app/jobs/calculate_metrics_job.rb",
+        "app/services/metric_calculator.rb"
+      ],
+      "acceptance_criteria": [
+        "CalculateMetricsJob.perform_now(company_id: 1) calculates all metrics",
+        "Profitability metrics derived correctly from financial statements",
+        "Growth metrics compare YoY correctly",
+        "Valuation metrics combine stock price and financial data",
+        "Handles missing data gracefully (nil values, zero denominators)"
+      ]
+    },
+    {
+      "step": 8,
+      "description": "Create rake tasks for data management",
+      "details": "Create stock_data namespace with tasks: import_companies, import_statements, import_prices (with optional CODE and FROM/TO args), calculate_metrics, refresh_all (runs all in sequence). Create analysis namespace with tasks for the three use cases.",
+      "files": [
+        "lib/tasks/stock_data.rake",
+        "lib/tasks/analysis.rake"
+      ],
+      "acceptance_criteria": [
+        "rake stock_data:import_companies works",
+        "rake stock_data:import_prices CODE=7203 works",
+        "rake stock_data:import_statements works",
+        "rake stock_data:calculate_metrics works",
+        "rake stock_data:refresh_all runs full pipeline"
+      ]
+    },
+    {
+      "step": 9,
+      "description": "Implement analysis use cases and Company model query methods",
+      "details": "Add scopes and methods to Company model for: (1) Finding companies with N consecutive periods of revenue/profit growth, sorted by growth rate. (2) Finding companies where OCF is positive, ICF is negative, and the OCF+ICF gap has turned positive. (3) Analyzing historical metrics for a specific company to find pre-breakthrough patterns. Create CompanyAnalyzer service for complex multi-step analyses. Create analysis rake tasks.",
+      "files": [
+        "app/models/company.rb",
+        "app/services/company_analyzer.rb",
+        "lib/tasks/analysis.rake"
+      ],
+      "acceptance_criteria": [
+        "Company.with_consecutive_revenue_growth(6) returns companies with 6+ periods of growth",
+        "Cash flow analysis correctly identifies OCF+/ICF- companies with gap turnaround",
+        "Historical analysis shows metric trends for a given company",
+        "Analysis tasks are runnable from rake and rails console"
+      ]
+    },
+    {
+      "step": 10,
+      "description": "Write tests, verify everything works, update WORKLOG.md, and push",
+      "details": "Write model tests for validations and associations. Write unit tests for MetricCalculator. Write integration tests for import jobs (using mocked API responses). Verify rails db:migrate, rails db:seed, and rake tasks all work. Update WORKLOG.md with progress. Commit and push.",
+      "files": [
+        "test/models/company_test.rb",
+        "test/models/financial_statement_test.rb",
+        "test/services/metric_calculator_test.rb",
+        "test/jobs/import_companies_job_test.rb",
+        "WORKLOG.md"
+      ],
+      "acceptance_criteria": [
+        "All tests pass (rails test)",
+        "No migration errors",
+        "WORKLOG.md is updated with completion summary",
+        "Code is committed and pushed to remote"
+      ]
+    }
+  ],
+  "risks": [
+    {
+      "risk": "Rails version mismatch",
+      "description": "Gemfile specifies rails ~> 8.1.2 but specs say Rails 8.2+. The installed version from Gemfile.lock should be used since it's already resolved. Rails 8.1.x is acceptable given it matches the lock file.",
+      "mitigation": "Use the version already in Gemfile.lock. If 8.2 is strictly required, update Gemfile constraint."
+    },
+    {
+      "risk": "J-Quants API rate limiting on free plan",
+      "description": "Free plan is limited to 5 requests/minute which makes large data imports very slow.",
+      "mitigation": "Rate limiter is built into the API client. Consider importing data incrementally (by code/date) rather than all at once."
+    },
+    {
+      "risk": "J-Quants API v2 field name changes",
+      "description": "Previous attempt had issues with field name mappings (abbreviated names in v2 like CoName, MktNm, etc.). The mapping could be wrong or change.",
+      "mitigation": "Reference the latest v2 migration docs. Log raw API responses during development for verification. Previous commit 56ae511 has corrected mappings to use."
+    },
+    {
+      "risk": "EDINET API complexity for XBRL parsing",
+      "description": "EDINET returns XBRL documents in ZIP format that require complex parsing. For the initial setup, we should focus on J-Quants for structured data and defer deep EDINET XBRL parsing.",
+      "mitigation": "Implement EDINET client for document listing but rely on J-Quants for financial statement data. EDINET XBRL parsing can be added later."
+    },
+    {
+      "risk": "SQLite performance with large datasets",
+      "description": "Stock price data for all listed companies over multiple years could be millions of rows. SQLite may have performance limitations for complex analytical queries.",
+      "mitigation": "Use proper indexes (already planned). Consider WAL mode for SQLite. Aggregate metrics are stored in separate tables to reduce query complexity on raw data."
+    },
+    {
+      "risk": "rails new may conflict with existing files",
+      "description": "Running rails new in a directory with existing Gemfile, Rakefile, config.ru may cause conflicts.",
+      "mitigation": "Use --force flag and --skip-bundle to avoid modifying Gemfile. Verify Gemfile is preserved after generation."
+    }
+  ],
+  "estimated_commits": 8
+}
