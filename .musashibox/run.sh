@@ -11,15 +11,18 @@ NC='\033[0m'
 
 echo -e "${GREEN}=== musashibox-claude ===${NC}\n"
 
-# Pre-flight checks
-# if [ ! -f "CLAUDE.md" ]; then
-#     echo -e "${RED}Error: CLAUDE.md not found!${NC}"
-#     echo ""
-#     echo "  cp CLAUDE.md.example CLAUDE.md"
-#     echo "  # Edit CLAUDE.md with your API key, repo URL, and specs"
-#     exit 1
-# fi
+# ========================
+# musashibox ENV Variables
+# ========================
+if [ -f "$SCRIPT_DIR/.env" ]; then
+  set -a
+  . "$SCRIPT_DIR/.env"
+  set +a
+fi
 
+# ========================
+# SSH Setup
+# ========================
 if [ ! -f "ssh-keys/id_ed25519" ]; then
     echo -e "${RED}Error: SSH key not found!${NC}"
     echo ""
@@ -28,6 +31,9 @@ if [ ! -f "ssh-keys/id_ed25519" ]; then
     exit 1
 fi
 
+# ========================
+# DOCKER Run
+# ========================
 if ! command -v docker &> /dev/null; then
     echo -e "${RED}Error: Docker is not installed${NC}"
     exit 1
@@ -43,7 +49,8 @@ echo -e "${YELLOW}Starting container...${NC}\n"
 
 docker run -it --rm \
     --name musashibox-claude \
-    # -v "$(pwd)/CLAUDE.md:/config/CLAUDE.md:ro" \
+    -e CLAUDE_CODE_OAUTH_TOKEN -e GIT_REPO_URL \
+    -e CLAUDE_CODE_EFFORT_LEVEL -e ANTHROPIC_MODEL \
     -v "$(pwd)/ssh-keys:/home/sandbox/.ssh-keys:ro" \
     musashibox-claude:latest
 
