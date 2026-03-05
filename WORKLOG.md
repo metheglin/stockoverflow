@@ -2,6 +2,41 @@
 
 Claude's development work log for this project.
 
+## 2026-03-05 PLAN: EDINET APIクライアント設計
+
+### 作業概要
+
+EDINET API v2の仕様を詳細調査し、APIクライアント（`EdinetApi`）およびXBRLパーサー（`EdinetXbrlParser`）の詳細設計書を作成した。
+
+### 調査内容
+
+- **EDINET API v2仕様**: ベースURL、認証方式（クエリパラメータ `Subscription-Key`）、書類一覧API（`GET /api/v2/documents.json`）のリクエストパラメータ・レスポンス全29フィールド、書類取得API（`GET /api/v2/documents/{docID}`）のtype=1〜5の取得形式、ZIPファイル内部構造
+- **docTypeCode一覧**: 有価証券報告書(120)、訂正有価証券報告書(130)、四半期報告書(140)、訂正四半期報告書(150)、半期報告書(160)、訂正半期報告書(170)を対象書類として選定。決算短信はEDINETでなくTDnet管轄のため対象外
+- **レート制限**: 書類一覧APIは1分に1回以下、書類取得APIは3〜5秒間隔が推奨。超過時429エラーまたは一時BAN
+- **XBRL構造**: jppfs_cor名前空間（日本基準）のP/L・B/S・C/F主要要素名、jpigp_cor（IFRS）の差異、コンテキストID（CurrentYearDuration / CurrentYearInstant / NonConsolidatedMember等）による期間・連結/個別の区別
+- **Ruby XBRL gem状況**: litexbrl（TDnetのみ対応、2016年頃停止）、xbrlware-ce（2010年停止）などいずれも古くメンテナンス停止 → Nokogiriによる自前実装を採用
+
+### 設計判断
+
+- **EdinetApi**: コーディング規約「汎用性と利便性」に従い、`api_key` を引数で受け取り `EdinetApi.default` でcredentialsから取得する便利メソッドを提供。Faraday + faraday-retry でHTTPクライアント実装。エラーハンドリング規約に従い例外は捕捉せず呼び出し元に委ねる
+- **EdinetXbrlParser**: Nokogiriベースの自前XBRL パーサー。要素名の候補配列で企業ごとの勘定科目差異に対応（例: NetSales / OperatingRevenue1）。コンテキストIDの正規表現マッチで連結/個別を分離
+- **rubyzip gem追加**: ZIPファイル展開用。Gemfileへの追加が必要
+- **EPS/BPS等のXBRL直接抽出は将来拡張**: 経営指標セクション（jpcrp_cor）に記載されることが多く、JQUANTS APIからの取得をメインとする方針
+
+### 成果物
+
+| ファイル | 内容 |
+|---------|------|
+| `todo/20260305_1020_dev_edinet_api_client_DEVELOP_pending.md` | EDINET APIクライアント・XBRLパーサーの詳細実装仕様書（DEVELOP TODO） |
+| `todo/20260305_1002_plan_edinet_api_client_PLAN_done.md` | 元PLANのステータスをdoneに変更 |
+
+### 設計したクラス一覧
+
+| クラス名 | 配置先 | 概要 |
+|---------|--------|------|
+| EdinetApi | app/lib/edinet_api.rb | EDINET API v2 HTTPクライアント。書類一覧取得・XBRL/CSVダウンロード |
+| EdinetXbrlParser | app/lib/edinet_xbrl_parser.rb | XBRLパーサー。ZIP展開→Nokogiriパース→財務数値抽出 |
+
 ## 2026-03-05 PLAN: データベース設計
 
 ### 作業概要
