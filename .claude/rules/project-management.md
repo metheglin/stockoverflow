@@ -40,6 +40,8 @@ Ex: `todo/20260303_1202_bugfix_apiclient_pending.md`
 - 成果物は新たなTODOで、 `todo/` 以下にタスクを作成する
   - 開発計画が必要な場合は、ファイル名の変数部分を次のように設定: TODO_TYPE=PLAN, TODO_STATUS=pending 
   - 実装・テスト・修正が必要な場合は、ファイル名の変数部分を次のように設定: TODO_TYPE=DEVELOP, TODO_STATUS=pending 
+- `WORKLOG.md`に作業ログを記述する
+- 成果物とともにpushする
 
 ### TODO_TYPE=PLAN 作業内容
 
