@@ -99,9 +99,11 @@ case "${TODO_TYPE}" in
     ;;
   THINK)
     COMMAND="TODO_TYPE=${TODO_TYPE} として、TODOを作成せよ"
+    exec claude --dangerously-skip-permissions -p "$COMMAND"
     ;;
   *)
-    # 想定外のタイプは何もしない（必要ならエラーにしてもOK）
+    echo "Unknown TODO_TYPE=${TODO_TYPE}"
+    exit 1
     :
     ;;
 esac
