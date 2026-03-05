@@ -9,7 +9,7 @@ YELLOW='\033[1;33m'
 RED='\033[0;31m'
 NC='\033[0m'
 
-echo -e "${GREEN}=== musashibox-claude ===${NC}\n"
+echo -e "${GREEN}=== musashibox ===${NC}\n"
 
 # ========================
 # musashibox ENV Variables
@@ -34,6 +34,9 @@ fi
 # ========================
 # DOCKER Run
 # ========================
+DOCKER_IMAGE_NAME=musashibox-stockoverflow
+DOCKER_TAG_NAME="${DOCKER_IMAGE_NAME}:latest"
+
 if ! command -v docker &> /dev/null; then
     echo -e "${RED}Error: Docker is not installed${NC}"
     exit 1
@@ -41,17 +44,17 @@ fi
 
 # Build
 echo -e "${YELLOW}Building image...${NC}"
-docker build -t musashibox-claude:latest .
+docker build -t ${DOCKER_TAG_NAME} .
 echo -e "${GREEN}Build complete${NC}\n"
 
 # Run
 echo -e "${YELLOW}Starting container...${NC}\n"
 
 docker run -it --rm \
-    --name musashibox-claude \
+    --name ${DOCKER_IMAGE_NAME} \
     -e CLAUDE_CODE_OAUTH_TOKEN -e GIT_REPO_URL \
     -e CLAUDE_CODE_EFFORT_LEVEL -e ANTHROPIC_MODEL \
     -v "$(pwd)/ssh-keys:/home/sandbox/.ssh-keys:ro" \
-    musashibox-claude:latest
+    ${DOCKER_TAG_NAME}
 
 echo -e "\n${GREEN}Container exited.${NC}"
