@@ -2,6 +2,24 @@
 
 Claude's development work log for this project.
 
+## 2026-03-05 DEVELOP: RSpec導入・テスト基盤構築
+
+### 作業概要
+
+テスティング規約で指定されている RSpec を導入し、テスト基盤を整備した。
+
+### 実施内容
+
+1. Gemfileに `rspec-rails` を追加し `bundle install` を実行
+2. `rails generate rspec:install` で初期ファイル（`.rspec`, `spec/spec_helper.rb`, `spec/rails_helper.rb`）を生成
+3. `spec/rails_helper.rb` の設定を調整
+   - `spec/support/` 配下の自動読み込みを有効化
+   - `infer_spec_type_from_file_location!` を有効化
+4. `spec/support/.keep` を作成
+5. minitest用の `test/` ディレクトリを削除
+6. CI（`.github/workflows/ci.yml`）のテスト実行コマンドを `bin/rails test` から `bundle exec rspec` に変更
+7. `bundle exec rspec` の正常動作を確認（0 examples, 0 failures）
+
 ## 2026-03-05 THINK: プロジェクト初期TODO作成
 
 ### 作業概要
