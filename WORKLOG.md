@@ -2,6 +2,61 @@
 
 Claude's development work log for this project.
 
+## 2026-03-05 DEVELOP: データベーススキーマ実装
+
+### 作業概要
+
+データベーススキーマの詳細設計書に基づき、マイグレーション・モデル・concern・テストを実装した。
+
+### 実施内容
+
+1. **JsonAttribute concern** (`app/models/concerns/json_attribute.rb`)
+   - JSON型カラムにスキーマを定義し、getter/setterを自動生成するconcern
+   - SQLiteがJSON型をtext列として格納する問題に対応するため、String型のJSON値もパースするよう実装
+
+2. **マイグレーション6件**（`db/migrate/`）
+   - `create_companies`: 企業マスター。edinet_code/securities_codeにunique index
+   - `create_financial_reports`: 決算報告書メタデータ。report_type/source enum対応
+   - `create_financial_values`: 財務数値。P/L・B/S・C/F主要16カラム + JSON拡張
+   - `create_financial_metrics`: 分析指標。YoY成長率・収益性・CF指標・連続指標
+   - `create_daily_quotes`: 株価四本値。バリュエーション指標算出用
+   - `create_application_properties`: アプリ全体メタデータ管理
+
+3. **モデル6件**
+   - `Company`, `FinancialReport`, `FinancialValue`, `FinancialMetric`, `DailyQuote`, `ApplicationProperty`
+   - enum定義、association、JsonAttribute連携を実装
+
+4. **テスト** (`spec/models/concerns/json_attribute_spec.rb`)
+   - getter: Hash/nil/未設定キーの各パターン
+   - setter: 新規設定/既存値保持/上書き
+   - String JSON: SQLite互換のString型JSON値のパース
+   - class_attribute: スキーマ定義の保持
+   - 9 examples, 0 failures
+
+### 修正・対応事項
+
+- `application_properties.data_json` のデフォルト値を `"{}"` (String) → `{}` (Hash) に修正。SQLiteではJSON型がtext列となり、String値がそのまま返される問題があった
+- JsonAttribute concernに `parse_#{column_name}` ヘルパーを追加し、String型JSON値をHashに変換する防御的実装とした
+
+### 成果物
+
+| ファイル | 内容 |
+|---------|------|
+| `app/models/concerns/json_attribute.rb` | JSON属性アクセサconcern |
+| `db/migrate/20260305110039_create_companies.rb` | companiesテーブル |
+| `db/migrate/20260305110043_create_financial_reports.rb` | financial_reportsテーブル |
+| `db/migrate/20260305110044_create_financial_values.rb` | financial_valuesテーブル |
+| `db/migrate/20260305110045_create_financial_metrics.rb` | financial_metricsテーブル |
+| `db/migrate/20260305110046_create_daily_quotes.rb` | daily_quotesテーブル |
+| `db/migrate/20260305110047_create_application_properties.rb` | application_propertiesテーブル |
+| `app/models/company.rb` | 企業モデル |
+| `app/models/financial_report.rb` | 決算報告書モデル |
+| `app/models/financial_value.rb` | 財務数値モデル |
+| `app/models/financial_metric.rb` | 分析指標モデル |
+| `app/models/daily_quote.rb` | 株価モデル |
+| `app/models/application_property.rb` | アプリメタデータモデル |
+| `spec/models/concerns/json_attribute_spec.rb` | JsonAttributeテスト |
+
 ## 2026-03-05 PLAN: EDINET APIクライアント設計
 
 ### 作業概要
