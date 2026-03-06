@@ -2,6 +2,40 @@
 
 Claude's development work log for this project.
 
+## 2026-03-06 PLAN: JQUANTS APIクライアント設計
+
+### 作業概要
+
+J-Quants API v2の仕様を詳細調査し、APIクライアント（`JquantsApi`）の詳細設計書を作成した。
+
+### 調査内容
+
+- **J-Quants API v2仕様**: ベースURL `https://api.jquants.com/v2/`、V2認証方式（`x-api-key`ヘッダー、トークンリフレッシュ不要）、レスポンス形式の統一（`{ "data": [...], "pagination_key": "..." }`）、ページネーション機構
+- **V1→V2移行の変更点**: 認証方式の変更（トークン方式→APIキー方式）、全エンドポイントのパス変更（例: `/v1/listed/info` → `/v2/equities/master`）、レスポンスフィールド名の省略形への変更（例: `CompanyName` → `CoName`、`Open` → `O`）
+- **レート制限**: Free=5req/min, Light=60, Standard=120, Premium=500
+- **主要エンドポイント**: 上場銘柄一覧(`/v2/equities/master`)、株価四本値(`/v2/equities/bars/daily`)、財務情報サマリー(`/v2/fins/summary`)、決算発表予定日(`/v2/equities/earnings-calendar`)
+
+### 設計判断
+
+- **V2 API採用**: 2025年12月22日以降の新規ユーザーはV2のみ利用可能。V2は `x-api-key` ヘッダー方式でトークン管理が不要なため、クライアント実装がシンプル
+- **ページネーション自動処理**: `load_all_pages` メソッドで `pagination_key` を自動追跡し、全ページを結合して返す設計。呼び出し元がページネーションを意識しなくてよい
+- **EdinetApiとの設計統一**: 同じFaradayベースの構成、同じ便利メソッドパターン（`JquantsApi.default`）、同じリトライ設定を採用
+- **EDINETとのデータ連携方針**: companies テーブルの `securities_code` で紐づけ。JQUANTSの構造化データを優先的に利用し、EDINET XBRL拡張要素で補完する方針
+- **V2省略フィールド名のマッピング**: V2レスポンスの省略フィールド名とDBカラムの対応表を詳細に文書化
+
+### 成果物
+
+| ファイル | 内容 |
+|---------|------|
+| `todo/20260306_1600_dev_jquants_api_client_DEVELOP_pending.md` | JQUANTS APIクライアント詳細実装仕様書（DEVELOP TODO） |
+| `todo/20260305_1003_plan_jquants_api_client_PLAN_done.md` | 元PLANのステータスをdoneに変更 |
+
+### 設計したクラス
+
+| クラス名 | 配置先 | 概要 |
+|---------|--------|------|
+| JquantsApi | app/lib/jquants_api.rb | J-Quants API v2 HTTPクライアント。上場銘柄一覧・株価四本値・財務サマリー・決算発表日の取得 |
+
 ## 2026-03-06 BUGFIX: EDINET APIクライアント バグ修正・テスト整備
 
 ### 作業概要
