@@ -2,6 +2,80 @@
 
 Claude's development work log for this project.
 
+## 2026-03-06 PLAN: データ取り込みパイプライン設計
+
+### 作業概要
+
+EDINET / JQUANTS から取得したデータをデータベースに取り込み、分析指標を算出するパイプラインの詳細設計をおこなった。5つのジョブの詳細設計書（DEVELOP TODO）を作成した。
+
+### 設計内容
+
+既存のAPIクライアント（`EdinetApi`, `JquantsApi`, `EdinetXbrlParser`）とDBスキーマ（`companies`, `financial_reports`, `financial_values`, `financial_metrics`, `daily_quotes`, `application_properties`）を前提に、以下のジョブを設計した。
+
+#### 1. SyncCompaniesJob（企業マスター同期）
+- JQUANTSの上場銘柄一覧から`companies`テーブルへupsert
+- `Company.get_attributes_from_jquants` でV2フィールドマッピング
+- JQUANTS一覧に存在しない既存上場企業の `listed: false` 更新
+- 週次実行
+
+#### 2. ImportJquantsFinancialDataJob（JQUANTS決算データ取り込み）
+- JQUANTS財務情報サマリーから`financial_reports` + `financial_values`を作成
+- `FinancialValue.get_attributes_from_jquants` で連結/個別のV2フィールドマッピング
+- 差分更新モード（日付指定API）と全件更新モード（銘柄指定API）の2モード
+- JQUANTS由来doc_id生成ルール: `JQ_{Code}_{FYEn}_{PerType}`
+- 日次実行
+
+#### 3. ImportEdinetDocumentsJob（EDINET決算データ取り込み）
+- EDINET書類一覧APIから有報・四半報を検出、XBRL取得・パース
+- JQUANTSデータの**補完**的位置づけ: 既存financial_valuesには拡張B/S項目のみマージ
+- EDINETコードと証券コードの紐づけ
+- 証券コード正規化（4桁→5桁）、四半期判定（期間月数ベース）
+- レート制限対応（書類取得間4秒sleep）
+- 日次実行
+
+#### 4. ImportDailyQuotesJob（株価データ取り込み）
+- JQUANTS株価四本値から`daily_quotes`テーブルへupsert
+- `DailyQuote.get_attributes_from_jquants` でV2フィールドマッピング
+- 差分取得（日付指定、土日スキップ）と全件取得（銘柄指定）の2モード
+- 日次実行
+
+#### 5. CalculateFinancialMetricsJob（指標算出）
+- `financial_values`から各種分析指標を算出し`financial_metrics`に保存
+- 成長性指標（YoY）: 前期±1ヶ月範囲で検索
+- 収益性指標: ROE, ROA, 営業利益率等
+- CF指標: フリーCF, 営業CF正負等
+- 連続指標: 連続増収増益期数
+- バリュエーション指標: PER, PBR, PSR（決算期末前後7日の株価使用）
+- 算出ロジックは`FinancialMetric`モデルのクラスメソッドとして配置
+- 決算データ取り込み後に日次実行
+
+### 設計判断
+
+- **JQUANTS優先方針**: JQUANTS構造化データを主ソースとし、EDINET XBRLは拡張B/S項目の補完に利用
+- **エラーハンドリング**: 全ジョブで個別レコードの失敗をrescueしてログ記録、バッチ全体を止めない設計
+- **application_properties活用**: edinet_sync/jquants_sync で最終同期日を管理し差分更新を実現
+- **フィールドマッピング定数**: V2 APIの省略フィールド名のマッピングをモデル定数として管理
+- **テスト方針**: 算出ロジック（モデルのクラスメソッド）を重点的にテスト、ジョブの稼働テストは記述しない
+
+### 推奨される実装順序
+
+1. SyncCompaniesJob（他ジョブの前提: companiesデータが必要）
+2. ImportJquantsFinancialDataJob（主要財務データの蓄積）
+3. ImportDailyQuotesJob（バリュエーション指標算出の前提）
+4. ImportEdinetDocumentsJob（JQUANTS補完）
+5. CalculateFinancialMetricsJob（全データ蓄積後に算出）
+
+### 成果物
+
+| ファイル | 内容 |
+|---------|------|
+| `todo/20260306_1700_dev_sync_companies_DEVELOP_pending.md` | 企業マスター同期ジョブ詳細設計 |
+| `todo/20260306_1701_dev_import_jquants_financial_data_DEVELOP_pending.md` | JQUANTS決算データ取り込みジョブ詳細設計 |
+| `todo/20260306_1702_dev_import_edinet_documents_DEVELOP_pending.md` | EDINET決算データ取り込みジョブ詳細設計 |
+| `todo/20260306_1703_dev_import_daily_quotes_DEVELOP_pending.md` | 株価データ取り込みジョブ詳細設計 |
+| `todo/20260306_1704_dev_calculate_financial_metrics_DEVELOP_pending.md` | 指標算出ジョブ詳細設計 |
+| `todo/20260305_1004_plan_data_import_pipeline_PLAN_done.md` | 元PLANのステータスをdoneに変更 |
+
 ## 2026-03-06 DEVELOP: JQUANTS APIクライアント実装
 
 ### 作業概要
