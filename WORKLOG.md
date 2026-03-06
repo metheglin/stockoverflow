@@ -2,6 +2,49 @@
 
 Claude's development work log for this project.
 
+## 2026-03-06 DEVELOP: JQUANTS APIクライアント実装
+
+### 作業概要
+
+J-Quants API v2のHTTPクライアント（`JquantsApi`）を実装し、Faradayスタブによるユニットテストを整備した。
+
+### 実施内容
+
+1. **JquantsApi** (`app/lib/jquants_api.rb`)
+   - J-Quants API v2へのHTTPリクエストクライアント
+   - Faraday + faraday-retry によるHTTP通信・自動リトライ（max: 2, interval: 3s, backoff: 2倍）
+   - 認証: `x-api-key` ヘッダー方式（V2 API）
+   - `load_listed_info`: 上場銘柄一覧取得
+   - `load_daily_quotes`: 株価四本値取得（from/to期間指定対応）
+   - `load_financial_statements`: 財務情報サマリー取得
+   - `load_earnings_calendar`: 決算発表予定日取得
+   - `load_all_pages`: ページネーション自動処理（`pagination_key` 追跡・全ページ結合）
+   - `PERIOD_TYPE_MAP`: CurPerType → report_type 変換マッピング定数
+   - コーディング規約「汎用性と利便性」に準拠: `api_key`を引数で受け取り、`JquantsApi.default`でcredentialsから取得する便利メソッドを提供
+
+2. **テスト** (`spec/lib/jquants_api_spec.rb`)
+   - Faraday::Adapter::Test::Stubs を使ったユニットテスト（7テスト）
+   - `load_listed_info`: 銘柄一覧取得・codeパラメータ指定・x-api-keyヘッダー検証
+   - `load_daily_quotes`: 四本値取得・from/toパラメータ検証
+   - `load_financial_statements`: 財務サマリー取得・codeパラメータ検証
+   - `load_earnings_calendar`: 決算発表日取得
+   - `load_all_pages`: ページネーション自動処理（2ページ結合）・単一ページ終了
+   - 実APIテストはAPIキー設定時のみ実行される形で配置（3テスト）
+   - `.default` メソッドはcredentials設定時のみ実行（1テスト）
+
+### テスト結果
+
+- 全スイート: 40 examples, 0 failures, 5 pending
+- JquantsApi: 11 examples, 0 failures, 4 pending
+- pendingはcredentials/APIキー未設定によるもの（正当なskip）
+
+### 成果物
+
+| ファイル | 内容 |
+|---------|------|
+| `app/lib/jquants_api.rb` | J-Quants API v2 HTTPクライアント |
+| `spec/lib/jquants_api_spec.rb` | JquantsApi テスト（スタブ+実API） |
+
 ## 2026-03-06 PLAN: JQUANTS APIクライアント設計
 
 ### 作業概要
