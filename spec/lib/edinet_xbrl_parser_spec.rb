@@ -1,25 +1,68 @@
 require "rails_helper"
 
 RSpec.describe EdinetXbrlParser do
+  def create_xbrl_zip(xbrl_content, entry_path: "XBRL/PublicDoc/test.xbrl")
+    tempfile = Tempfile.new(["test_xbrl_", ".zip"])
+    tempfile.binmode
+
+    Zip::OutputStream.open(tempfile.path) do |zos|
+      zos.put_next_entry(entry_path)
+      zos.write(xbrl_content)
+    end
+
+    tempfile
+  end
+
   describe "#parse" do
-    context "テスト用XBRLフィクスチャが存在する場合" do
-      let(:fixture_zip_path) { Rails.root.join("spec/fixtures/edinet/sample_xbrl.zip") }
+    it "ZIPからXBRLを読み出し、連結・個別の財務数値を抽出する" do
+      xbrl = <<~XML
+        <?xml version="1.0" encoding="UTF-8"?>
+        <xbrli:xbrl
+          xmlns:xbrli="http://www.xbrl.org/2003/instance"
+          xmlns:jppfs_cor="http://disclosure.edinet-fsa.go.jp/taxonomy/jppfs/cor">
+          <jppfs_cor:NetSales contextRef="CurrentYearDuration" unitRef="JPY" decimals="0">10000000000</jppfs_cor:NetSales>
+          <jppfs_cor:OperatingIncome contextRef="CurrentYearDuration" unitRef="JPY" decimals="0">1000000000</jppfs_cor:OperatingIncome>
+          <jppfs_cor:Assets contextRef="CurrentYearInstant" unitRef="JPY" decimals="0">20000000000</jppfs_cor:Assets>
+          <jppfs_cor:NetSales contextRef="CurrentYearDuration_NonConsolidatedMember" unitRef="JPY" decimals="0">5000000000</jppfs_cor:NetSales>
+          <jppfs_cor:Assets contextRef="CurrentYearInstant_NonConsolidatedMember" unitRef="JPY" decimals="0">15000000000</jppfs_cor:Assets>
+        </xbrli:xbrl>
+      XML
 
-      before do
-        skip "XBRLフィクスチャが未配置" unless File.exist?(fixture_zip_path)
-      end
+      zipfile = create_xbrl_zip(xbrl)
+      parser = EdinetXbrlParser.new(zip_path: zipfile.path)
+      result = parser.parse
 
-      it "連結財務数値を抽出できる" do
-        parser = EdinetXbrlParser.new(zip_path: fixture_zip_path.to_s)
-        result = parser.parse
+      expect(result[:consolidated][:net_sales]).to eq(10_000_000_000)
+      expect(result[:consolidated][:operating_income]).to eq(1_000_000_000)
+      expect(result[:consolidated][:total_assets]).to eq(20_000_000_000)
+      expect(result[:non_consolidated][:net_sales]).to eq(5_000_000_000)
+      expect(result[:non_consolidated][:total_assets]).to eq(15_000_000_000)
 
-        expect(result).to have_key(:consolidated)
-        consolidated = result[:consolidated]
-        # 売上高・営業利益・総資産のいずれかが取得できていること
-        expect(
-          consolidated[:net_sales] || consolidated[:operating_income] || consolidated[:total_assets]
-        ).not_to be_nil
-      end
+      zipfile.close!
+    end
+
+    it "XBRLファイルが見つからない場合nilを返す" do
+      zipfile = create_xbrl_zip("dummy", entry_path: "other/path/file.txt")
+      parser = EdinetXbrlParser.new(zip_path: zipfile.path)
+      result = parser.parse
+
+      expect(result).to be_nil
+
+      zipfile.close!
+    end
+  end
+
+  describe "#load_xbrl_from_zip" do
+    it "ZIP内のXBRL/PublicDoc/*.xbrlファイルの内容を返す" do
+      xbrl = "<xbrl>test content</xbrl>"
+      zipfile = create_xbrl_zip(xbrl)
+      parser = EdinetXbrlParser.new(zip_path: zipfile.path)
+
+      content = parser.load_xbrl_from_zip
+
+      expect(content).to eq(xbrl)
+
+      zipfile.close!
     end
   end
 
@@ -38,13 +81,11 @@ RSpec.describe EdinetXbrlParser do
       doc = Nokogiri::XML(xml)
       parser = EdinetXbrlParser.new(zip_path: "dummy")
 
-      # P/L項目（duration context）
-      mapping = { elements: ["NetSales"], namespace: "jppfs_cor" }
+      mapping = {elements: ["NetSales"], namespace: "jppfs_cor"}
       value = parser.find_element_value(doc, mapping, /\ACurrentYearDuration\z/)
       expect(value).to eq(1_234_567_890)
 
-      # B/S項目（instant context）
-      mapping = { elements: ["Assets"], namespace: "jppfs_cor" }
+      mapping = {elements: ["Assets"], namespace: "jppfs_cor"}
       value = parser.find_element_value(doc, mapping, /\ACurrentYearInstant\z/)
       expect(value).to eq(9_876_543_210)
     end
@@ -62,8 +103,7 @@ RSpec.describe EdinetXbrlParser do
       doc = Nokogiri::XML(xml)
       parser = EdinetXbrlParser.new(zip_path: "dummy")
 
-      # NetSalesがない場合、OperatingRevenue1を検索
-      mapping = { elements: ["NetSales", "OperatingRevenue1"], namespace: "jppfs_cor" }
+      mapping = {elements: ["NetSales", "OperatingRevenue1"], namespace: "jppfs_cor"}
       value = parser.find_element_value(doc, mapping, /\ACurrentYearDuration\z/)
       expect(value).to eq(5_000_000_000)
     end
@@ -78,7 +118,7 @@ RSpec.describe EdinetXbrlParser do
       doc = Nokogiri::XML(xml)
       parser = EdinetXbrlParser.new(zip_path: "dummy")
 
-      mapping = { elements: ["NetSales"], namespace: "jppfs_cor" }
+      mapping = {elements: ["NetSales"], namespace: "jppfs_cor"}
       value = parser.find_element_value(doc, mapping, /\ACurrentYearDuration\z/)
       expect(value).to be_nil
     end
@@ -96,7 +136,7 @@ RSpec.describe EdinetXbrlParser do
       doc = Nokogiri::XML(xml)
       parser = EdinetXbrlParser.new(zip_path: "dummy")
 
-      mapping = { elements: ["NetCashProvidedByUsedInInvestmentActivities"], namespace: "jppfs_cor" }
+      mapping = {elements: ["NetCashProvidedByUsedInInvestmentActivities"], namespace: "jppfs_cor"}
       value = parser.find_element_value(doc, mapping, /\ACurrentYearDuration\z/)
       expect(value).to eq(-500_000_000)
     end
@@ -115,7 +155,7 @@ RSpec.describe EdinetXbrlParser do
       doc = Nokogiri::XML(xml)
       parser = EdinetXbrlParser.new(zip_path: "dummy")
 
-      mapping = { elements: ["NetSales"], namespace: "jppfs_cor" }
+      mapping = {elements: ["NetSales"], namespace: "jppfs_cor"}
       value = parser.find_element_value(doc, mapping, /\ACurrentYearDuration\z/)
       expect(value).to eq(1_200_000_000)
     end

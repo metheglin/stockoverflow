@@ -2,6 +2,57 @@
 
 Claude's development work log for this project.
 
+## 2026-03-06 BUGFIX: EDINET APIクライアント バグ修正・テスト整備
+
+### 作業概要
+
+EdinetApi のURLパス解決バグを修正し、EdinetApi・EdinetXbrlParser 両方のテストを実際に動作を検証するテストに書き直した。
+
+### 発見したバグ
+
+**EdinetApi: URLパス解決の不具合（致命的）**
+
+`BASE_URL = "https://api.edinet-fsa.go.jp/api/v2"` に対して、`get("/documents.json", ...)` のように先頭 `/` 付きの絶対パスを使用していたため、Faradayがベースパス `/api/v2` を無視し、`https://api.edinet-fsa.go.jp/documents.json` にリクエストを送信していた。正しくは `/api/v2/documents.json` にリクエストすべきであり、全てのAPIリクエストが誤ったURLに送られていた。
+
+### 修正内容
+
+1. **`app/lib/edinet_api.rb`**
+   - `BASE_URL` に末尾スラッシュを追加: `"https://api.edinet-fsa.go.jp/api/v2/"`
+   - 全てのパス引数から先頭 `/` を除去し相対パスに変更:
+     - `"/documents.json"` → `"documents.json"`
+     - `"/documents/#{doc_id}"` → `"documents/#{doc_id}"`
+
+2. **`spec/lib/edinet_api_spec.rb`** 全面書き直し
+   - Faraday::Adapter::Test::Stubs を使ったユニットテストを新規追加（7テスト）
+   - リクエスト先URL・パラメータ（Subscription-Key, date, type）を実際に検証
+   - `load_documents`, `load_target_documents`, `load_xbrl_zip`, `load_csv_zip` の各メソッドをテスト
+   - 実APIテストはAPIキー設定時のみ実行される形で残存（`context ... if:` 形式）
+
+3. **`spec/lib/edinet_xbrl_parser_spec.rb`** 全面書き直し
+   - テスト内でZIPファイルを動的に作成するヘルパーメソッド `create_xbrl_zip` を追加
+   - `#parse` のフルフローテストを追加（ZIPからXBRL読み出し→パース→連結/個別抽出）
+   - `#load_xbrl_from_zip` のテストを追加
+   - 既存の `#find_element_value`, `#extract_values` テストも維持（skipなし）
+
+### 前回の問題点
+
+- EdinetApiのテストは全て `skip "EDINET API key not configured"` で実行されておらず、バグが検出されなかった
+- EdinetXbrlParserの `#parse` テストも `skip "XBRLフィクスチャが未配置"` でスキップされていた
+- テスト結果 "23 examples, 0 failures" は技術的に正しいが、実質的にEdinetApiの動作検証は0件だった
+
+### テスト結果
+
+- 29 examples, 0 failures, 1 pending
+- pendingは `.default` メソッドのcredentials未設定によるもの（正当なskip）
+
+### 成果物
+
+| ファイル | 変更内容 |
+|---------|---------|
+| `app/lib/edinet_api.rb` | URLパス解決バグ修正 |
+| `spec/lib/edinet_api_spec.rb` | Faraday stubベースのユニットテストに書き直し |
+| `spec/lib/edinet_xbrl_parser_spec.rb` | 動的ZIP生成によるフルフローテストに書き直し |
+
 ## 2026-03-06 DEVELOP: EDINET APIクライアント・XBRLパーサー実装
 
 ### 作業概要

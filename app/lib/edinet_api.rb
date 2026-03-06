@@ -1,5 +1,5 @@
 class EdinetApi
-  BASE_URL = "https://api.edinet-fsa.go.jp/api/v2"
+  BASE_URL = "https://api.edinet-fsa.go.jp/api/v2/"
 
   DOC_TYPE_CODES = {
     annual_securities_report: "120",
@@ -47,7 +47,7 @@ class EdinetApi
       date: date.is_a?(Date) ? date.strftime("%Y-%m-%d") : date,
       type: include_documents ? 2 : 1,
     }
-    response = get("/documents.json", params)
+    response = get("documents.json", params)
     JSON.parse(response.body)
   end
 
@@ -83,7 +83,7 @@ class EdinetApi
   #   # zip_file.path で一時ファイルのパスを取得可能
   #
   def load_xbrl_zip(doc_id:)
-    response = get("/documents/#{doc_id}", { type: 1 })
+    response = get("documents/#{doc_id}", { type: 1 })
     tempfile = Tempfile.new(["edinet_#{doc_id}_", ".zip"], binmode: true)
     tempfile.write(response.body)
     tempfile.rewind
@@ -96,7 +96,7 @@ class EdinetApi
   # @return [Tempfile] ZIPファイルが書き込まれたTempfile
   #
   def load_csv_zip(doc_id:)
-    response = get("/documents/#{doc_id}", { type: 5 })
+    response = get("documents/#{doc_id}", { type: 5 })
     tempfile = Tempfile.new(["edinet_csv_#{doc_id}_", ".zip"], binmode: true)
     tempfile.write(response.body)
     tempfile.rewind
