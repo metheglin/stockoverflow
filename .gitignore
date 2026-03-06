@@ -33,3 +33,6 @@
 # Ignore key files for decrypting credentials and more.
 /config/*.key
 
+# EDINET XBRL test fixtures (large ZIP files)
+spec/fixtures/edinet/*.zip
+

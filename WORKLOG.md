@@ -2,6 +2,62 @@
 
 Claude's development work log for this project.
 
+## 2026-03-06 DEVELOP: EDINET APIクライアント・XBRLパーサー実装
+
+### 作業概要
+
+EDINET API v2のHTTPクライアント（`EdinetApi`）およびXBRLパーサー（`EdinetXbrlParser`）を実装した。
+
+### 実施内容
+
+1. **Gemfile更新**
+   - `rubyzip` gemを追加（ZIPファイル展開用）
+   - `bundle install` 実行
+
+2. **EdinetApi** (`app/lib/edinet_api.rb`)
+   - EDINET API v2へのHTTPリクエストクライアント
+   - Faraday + faraday-retry によるHTTP通信・自動リトライ
+   - `load_documents`: 書類一覧取得（JSON）
+   - `load_target_documents`: 対象書類種別（有価証券報告書・四半期報告書等）のみ絞り込み
+   - `load_xbrl_zip`: XBRLデータのZIPダウンロード
+   - `load_csv_zip`: CSVデータのZIPダウンロード
+   - コーディング規約「汎用性と利便性」に準拠: `api_key`を引数で受け取り、`EdinetApi.default`でcredentialsから取得する便利メソッドを提供
+
+3. **EdinetXbrlParser** (`app/lib/edinet_xbrl_parser.rb`)
+   - Nokogiriベースの自前XBRLパーサー
+   - ZIP展開 → XBRLインスタンスファイル読み出し → 財務数値抽出
+   - `ELEMENT_MAPPING`: P/L・B/S・C/F固定カラム対応のXBRL要素マッピング（候補配列で企業ごとの勘定科目差異に対応）
+   - `EXTENDED_ELEMENT_MAPPING`: data_json格納用の拡張要素マッピング
+   - `CONTEXT_PATTERNS`: コンテキストIDの正規表現で連結/個別を分離
+   - 名前空間未定義時の`Nokogiri::XML::XPath::SyntaxError`を安全にハンドリング
+
+4. **テスト**
+   - `spec/lib/edinet_api_spec.rb`: APIキー設定時のみ実行される実API呼び出しテスト（4 examples, 4 pending）
+   - `spec/lib/edinet_xbrl_parser_spec.rb`: インラインXMLによる単体テスト（10 examples, 0 failures, 1 pending）
+     - `find_element_value`: 値抽出、候補配列フォールバック、nil返却、マイナス値、コンテキストフィルタリング
+     - `extract_values`: 連結・個別抽出、主要項目nil判定、拡張要素格納
+   - 全体: 23 examples, 0 failures
+
+5. **フィクスチャ・.gitignore**
+   - `spec/fixtures/edinet/` ディレクトリ作成
+   - `.gitignore` にXBRLフィクスチャZIPファイルの除外を追加
+
+### 修正・対応事項
+
+- `find_element_value`で名前空間が未定義のXML（テスト用の最小XMLなど）に対してxpath実行時に`Nokogiri::XML::XPath::SyntaxError`が発生する問題を修正。rescue句でスキップしnilを返すよう対応
+
+### 成果物
+
+| ファイル | 内容 |
+|---------|------|
+| `Gemfile` | rubyzip gem追加 |
+| `app/lib/edinet_api.rb` | EDINET API v2 HTTPクライアント |
+| `app/lib/edinet_xbrl_parser.rb` | XBRLパーサー |
+| `spec/lib/edinet_api_spec.rb` | EdinetApi テスト |
+| `spec/lib/edinet_xbrl_parser_spec.rb` | EdinetXbrlParser テスト |
+| `spec/fixtures/edinet/.keep` | テストフィクスチャディレクトリ |
+| `.gitignore` | XBRLフィクスチャZIP除外追加 |
+
 ## 2026-03-05 DEVELOP: データベーススキーマ実装
 
 ### 作業概要
