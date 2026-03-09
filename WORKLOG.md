@@ -2,6 +2,55 @@
 
 Claude's development work log for this project.
 
+## 2026-03-09 DEVELOP: JQUANTS決算データ取り込みジョブ実装
+
+### 作業概要
+
+JQUANTSの財務情報サマリーAPI (`/v2/fins/summary`) から決算データを取得し、`financial_reports` / `financial_values` テーブルに保存する `ImportJquantsFinancialDataJob` を実装した。
+
+### 実施内容
+
+1. **FinancialValue モデル拡張** (`app/models/financial_value.rb`)
+   - `JQUANTS_CONSOLIDATED_FIELD_MAP`: 連結決算のV2フィールド → financial_valuesカラムの対応マッピング（16フィールド）
+   - `JQUANTS_CONSOLIDATED_DATA_JSON_MAP`: data_jsonに格納する連結予想・配当フィールド（6フィールド）
+   - `JQUANTS_NON_CONSOLIDATED_FIELD_MAP`: 個別決算のNC*フィールド → カラムの対応マッピング（8フィールド）
+   - `INTEGER_COLUMNS` / `DECIMAL_COLUMNS`: 型変換用のカラム分類定数
+   - `FinancialValue.get_attributes_from_jquants(data, scope_type:)`: JQUANTSレスポンスから属性Hashを生成するクラスメソッド
+   - `FinancialValue.parse_jquants_value(raw_value, column)`: 文字列値をカラム型に変換するクラスメソッド
+   - `FinancialValue.parse_jquants_value_raw(raw_value)`: data_json用の型推定変換メソッド
+
+2. **ImportJquantsFinancialDataJob** (`app/jobs/import_jquants_financial_data_job.rb`)
+   - 3つの実行モード: 差分更新（デフォルト）、全件更新（`full: true`）、特定日指定（`target_date:`）
+   - `import_statement`: 1件の財務情報サマリーからfinancial_report + financial_value（連結・個別）を作成/更新
+   - JQUANTS由来doc_id生成: `JQ_{Code}_{CurFYEn}_{CurPerType}`
+   - 既存data_jsonのマージ（EDINET由来の拡張データを保持）
+   - `application_properties`（kind: `jquants_sync`）で最終同期日を管理
+   - 個別レコードの失敗時はログに記録して次のレコードへ継続
+
+3. **テスト** (`spec/models/financial_value_spec.rb`)
+   - `FinancialValue.get_attributes_from_jquants`: 属性Hash生成テスト（5 examples）
+     - 連結: 固定カラム16フィールドの変換検証
+     - 連結: data_json 6フィールドの変換検証
+     - 連結: 空文字列/nil のnil変換検証
+     - 個別: NC*フィールド8フィールドの変換検証
+     - 個別: data_jsonが設定されないことの検証
+   - `FinancialValue.parse_jquants_value`: 型変換テスト（5 examples）
+     - 整数カラム/小数カラム/空文字列/nil/負の値
+
+### テスト結果
+
+- 全スイート: 53 examples, 0 failures, 5 pending
+- FinancialValue: 10 examples, 0 failures
+- pendingはcredentials/APIキー未設定によるもの（正当なskip）
+
+### 成果物
+
+| ファイル | 内容 |
+|---------|------|
+| `app/models/financial_value.rb` | JQUANTS フィールドマッピング定数・属性変換メソッド追加 |
+| `app/jobs/import_jquants_financial_data_job.rb` | JQUANTS決算データ取り込みジョブ新規作成 |
+| `spec/models/financial_value_spec.rb` | FinancialValue テスト新規作成 |
+
 ## 2026-03-09 DEVELOP: 企業マスター同期ジョブ実装
 
 ### 作業概要
