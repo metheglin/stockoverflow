@@ -2,6 +2,46 @@
 
 Claude's development work log for this project.
 
+## 2026-03-09 DEVELOP: 企業マスター同期ジョブ実装
+
+### 作業概要
+
+JQUANTSの上場銘柄一覧APIから企業マスター（`companies`テーブル）を同期する `SyncCompaniesJob` を実装した。
+
+### 実施内容
+
+1. **Company モデル拡張** (`app/models/company.rb`)
+   - `JQUANTS_FIELD_MAP`: JQUANTS V2レスポンスフィールド → companiesカラムの対応マッピング定数
+   - `JQUANTS_DATA_JSON_FIELDS`: data_jsonに格納するフィールド（Mrgn, MrgnNm）
+   - `Company.get_attributes_from_jquants(data)`: JQUANTSレスポンスからCompany属性Hashを生成するクラスメソッド
+
+2. **SyncCompaniesJob** (`app/jobs/sync_companies_job.rb`)
+   - JQUANTS APIから上場銘柄一覧を全件取得し、`securities_code`をキーにupsert
+   - JQUANTS一覧に存在しない既存上場企業を`listed: false`に更新（`mark_unlisted`）
+   - `application_properties`に最終同期時刻を記録（`record_sync_time`）
+   - 個別企業のDB保存失敗時はログに記録して次の企業へ継続（エラーハンドリング規約準拠）
+   - `api_key`引数対応: nilの場合はcredentialsから取得
+
+3. **テスト** (`spec/models/company_spec.rb`)
+   - `Company.get_attributes_from_jquants`: 属性Hash生成テスト（3 examples）
+     - 全フィールドの正しいマッピング検証
+     - data_jsonフィールドの設定検証
+     - 存在しないキーのスキップ検証
+
+### テスト結果
+
+- 全スイート: 43 examples, 0 failures, 5 pending
+- Company: 3 examples, 0 failures
+- pendingはcredentials/APIキー未設定によるもの（正当なskip）
+
+### 成果物
+
+| ファイル | 内容 |
+|---------|------|
+| `app/models/company.rb` | JQUANTS フィールドマッピング定数・属性変換メソッド追加 |
+| `app/jobs/sync_companies_job.rb` | 企業マスター同期ジョブ新規作成 |
+| `spec/models/company_spec.rb` | Company.get_attributes_from_jquants テスト |
+
 ## 2026-03-06 PLAN: データ取り込みパイプライン設計
 
 ### 作業概要
