@@ -18,9 +18,9 @@ echo -e "${CYAN}========================================${NC}"
 echo -e "\n${YELLOW}[1/4] SSH setup...${NC}"
 
 if [ ! -f "$HOME_DIR/.ssh-keys/id_ed25519" ]; then
-    echo -e "${RED}  Error: SSH key not found at $HOME_DIR/.ssh-keys/${NC}"
-    echo "  Run setup-keys.sh on the host first."
-    exit 1
+  echo -e "${RED}  Error: SSH key not found at $HOME_DIR/.ssh-keys/${NC}"
+  echo "  Run setup-keys.sh on the host first."
+  exit 1
 fi
 
 mkdir -p "$HOME_DIR/.ssh"
@@ -52,20 +52,20 @@ git config --global user.email "musashibox@example.com"
 git config --global user.name "musashibox"
 
 if [ -n "$GIT_REPO_URL" ]; then
-    if [ -d "$PROJECT_DIR/.git" ]; then
-        echo "  Pulling latest..."
-        cd "$PROJECT_DIR"
-        git pull origin "$(git rev-parse --abbrev-ref HEAD)" || echo "  Note: pull failed, continuing with local"
-        echo -e "${GREEN}  Repository updated${NC}"
-    else
-        echo "  Cloning $GIT_REPO_URL ..."
-        rm -rf "$PROJECT_DIR"
-        git clone "$GIT_REPO_URL" "$PROJECT_DIR"
-        echo -e "${GREEN}  Repository cloned${NC}"
-    fi
+  if [ -d "$PROJECT_DIR/.git" ]; then
+    echo "  Pulling latest..."
+    cd "$PROJECT_DIR"
+    git pull origin "$(git rev-parse --abbrev-ref HEAD)" || echo "  Note: pull failed, continuing with local"
+    echo -e "${GREEN}  Repository updated${NC}"
+  else
+    echo "  Cloning $GIT_REPO_URL ..."
+    rm -rf "$PROJECT_DIR"
+    git clone "$GIT_REPO_URL" "$PROJECT_DIR"
+    echo -e "${GREEN}  Repository cloned${NC}"
+  fi
 else
-    echo "  No GIT_REPO_URL set, skipping."
-    mkdir -p "$PROJECT_DIR"
+  echo "  No GIT_REPO_URL set, skipping."
+  mkdir -p "$PROJECT_DIR"
 fi
 
 cd "$PROJECT_DIR"
@@ -85,7 +85,10 @@ TODO_TYPE="$(echo $OUT | cut -d: -f1)"
 TODO_FILE="$(echo $OUT | cut -d: -f2)"
 
 # 「:」が無い/空などの異常ケースは何もしない
-[ -n "${TODO_TYPE}" ] || exit 0
+[ -n "${TODO_TYPE}" ] || {
+  echo "Nothing to do 🙄 Please review pending todos."
+  exit 0
+}
 
 # 3) TODO_TYPE に応じて出力
 case "${TODO_TYPE}" in
