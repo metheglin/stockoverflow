@@ -2,6 +2,49 @@
 
 Claude's development work log for this project.
 
+## 2026-03-10 DEVELOP: EDINET決算データ取り込みジョブ実装
+
+### 作業概要
+
+EDINETの書類一覧APIから有価証券報告書・四半期報告書を検出し、XBRLデータを取得・パースして `financial_reports` / `financial_values` テーブルに保存する `ImportEdinetDocumentsJob` を実装した。
+
+### 実施内容
+
+1. **ImportEdinetDocumentsJob** (`app/jobs/import_edinet_documents_job.rb`)
+   - EDINET書類一覧APIから対象日の書類を取得し、XBRLをダウンロード・パースして財務データを取り込む
+   - `DOC_TYPE_REPORT_MAP`: docTypeCode → report_type の変換マッピング定数
+   - `SLEEP_BETWEEN_DOCS = 4`, `SLEEP_BETWEEN_DAYS = 2`: EDINET APIレート制限対応
+   - `from_date`, `to_date` パラメータで取得期間を指定可能。未指定時は `application_properties` (kind: `edinet_sync`) の `last_synced_date` から昨日まで
+   - `api_key` パラメータ対応: nilの場合はcredentialsから取得
+   - 企業検索: 証券コード（5桁正規化）→ EDINETコード → 新規作成のフォールバック
+   - EDINETコード未設定の既存企業に対してEDINETコードを補完
+   - データ補完戦略: 既存FinancialValue（JQUANTS由来）には拡張B/S項目のみマージ、新規の場合はXBRL抽出値で作成
+   - エラーハンドリング: 日単位・書類単位でrescueし、バッチ全体を止めない設計
+   - Tempfileの確実なクリーンアップ（ensureブロック）
+
+2. **公開メソッド**（テスト可能な設計）
+   - `normalize_securities_code(code)`: 証券コードの5桁正規化（4桁→末尾0追加、"0"/空文字→nil）
+   - `determine_report_type(doc)`: docTypeCodeと期間からreport_typeを判定
+   - `determine_quarter(doc)`: 四半期報告書の期間判定（月数差でq1/q2/q3/annual）
+
+3. **テスト** (`spec/jobs/import_edinet_documents_job_spec.rb`)
+   - `#normalize_securities_code`: 6 examples（4桁正規化、5桁そのまま、空文字列、nil、"0"、空白除去）
+   - `#determine_report_type`: 8 examples（annual、semi_annual、四半期3種、不明コード）
+   - `#determine_quarter`: 7 examples（q1/q2/q3/annual、nil日付、不正な日付）
+
+### テスト結果
+
+- 全スイート: 74 examples, 0 failures, 5 pending
+- ImportEdinetDocumentsJob: 21 examples, 0 failures
+- pendingはcredentials/APIキー未設定によるもの（正当なskip）
+
+### 成果物
+
+| ファイル | 内容 |
+|---------|------|
+| `app/jobs/import_edinet_documents_job.rb` | EDINET決算データ取り込みジョブ新規作成 |
+| `spec/jobs/import_edinet_documents_job_spec.rb` | ImportEdinetDocumentsJob テスト新規作成 |
+
 ## 2026-03-09 DEVELOP: JQUANTS決算データ取り込みジョブ実装
 
 ### 作業概要
