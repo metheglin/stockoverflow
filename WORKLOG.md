@@ -2,6 +2,46 @@
 
 Claude's development work log for this project.
 
+## 2026-03-10 THINK: 次期開発TODO作成
+
+### 作業概要
+
+プロジェクトの現状を棚卸しし、CLAUDE.mdに記載されたプロジェクト目的・ユースケースの実現に必要な次期開発TODOを作成した。
+
+### 現状分析
+
+全14件の既存TODOがすべて完了済み。以下の基盤が整備されている:
+
+- **データベース**: 6テーブル（companies, financial_reports, financial_values, financial_metrics, daily_quotes, application_properties）
+- **APIクライアント**: EDINET API, JQUANTS API, EDINET XBRLパーサー
+- **データ取り込みジョブ**: SyncCompaniesJob, ImportJquantsFinancialDataJob, ImportEdinetDocumentsJob, ImportDailyQuotesJob, CalculateFinancialMetricsJob
+- **テスト**: 101 examples, 0 failures, 5 pending（credentials未設定による正当なskip）
+
+### 識別したギャップ
+
+データの蓄積・指標算出基盤は完成しているが、プロジェクト目的である「特定の条件で絞り込み、注目すべき企業を一覧できるシステム」を実現するために以下が不足:
+
+1. **分析クエリレイヤーが未実装**: CLAUDE.mdの3つのユースケース（連続増収増益、CF転換、業績転換点分析）を実行するためのスコープ・クエリオブジェクトが存在しない
+2. **Web APIが未実装**: `config/routes.rb` にはヘルスチェックのみ。データにアクセスする手段がない
+3. **ジョブスケジューリングが未設定**: 5つのジョブは実装済みだが定期実行の仕組みがない。初期データロード手順も未整備
+4. **データ整合性チェックが未実装**: バッチの個別エラーは rescue して継続する設計だが、取り込み漏れや算出漏れを検知する仕組みがない
+
+### 作成したTODO
+
+| ファイル | 種別 | 優先度 | 内容 |
+|---------|------|--------|------|
+| `20260310_1400_plan_analysis_query_layer_PLAN_pending.md` | PLAN | 最高 | 分析クエリレイヤー設計（3つのユースケースに対応するスコープ・QueryObject設計） |
+| `20260310_1401_plan_web_api_PLAN_pending.md` | PLAN | 高 | Web API設計（REST APIエンドポイント・シリアライザー・認証） |
+| `20260310_1402_dev_job_scheduling_DEVELOP_pending.md` | DEVELOP | 中 | ジョブスケジューリング・初期データロード整備（Solid Queue定期実行、rakeタスク） |
+| `20260310_1403_improve_data_integrity_check_DEVELOP_pending.md` | DEVELOP | 中 | データ整合性チェック・モニタリング（算出漏れ検出、同期状態確認） |
+
+### 推奨される作業順序
+
+1. **分析クエリレイヤー設計**（PLAN）→ 詳細設計書に基づく実装（DEVELOP）
+2. **Web API設計**（PLAN）→ 詳細設計書に基づく実装（DEVELOP）※ 分析クエリレイヤーに依存
+3. **ジョブスケジューリング・初期データロード**（DEVELOP）※ 独立して並行可能
+4. **データ整合性チェック**（DEVELOP）※ 独立して並行可能
+
 ## 2026-03-10 DEVELOP: 指標算出ジョブ実装
 
 ### 作業概要
