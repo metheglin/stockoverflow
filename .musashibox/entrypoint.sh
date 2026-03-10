@@ -79,6 +79,11 @@ echo -e "${CYAN}========================================${NC}\n"
 OUT="$("${PROJECT_DIR}/.musashibox/find_next_todo.sh")"
 echo $OUT
 
+[ -n "${OUT}" ] || {
+  echo "Nothing to do 🙄 Please review pending todos."
+  exit 0
+}
+
 # 2) 「:」で分割して TODO_TYPE / TODO_FILE に入れる
 #    例: DEVELOP:path/to/todo1.md
 TODO_TYPE="$(echo $OUT | cut -d: -f1)"
@@ -86,8 +91,8 @@ TODO_FILE="$(echo $OUT | cut -d: -f2)"
 
 # 「:」が無い/空などの異常ケースは何もしない
 [ -n "${TODO_TYPE}" ] || {
-  echo "Nothing to do 🙄 Please review pending todos."
-  exit 0
+  echo "Unknown TODO_TYPE=${TODO_TYPE}"
+  exit 1
 }
 
 # 3) TODO_TYPE に応じて出力
