@@ -2,6 +2,53 @@
 
 Claude's development work log for this project.
 
+## 2026-03-10 DEVELOP: 指標算出ジョブ実装
+
+### 作業概要
+
+`financial_values` テーブルの財務数値から各種分析指標を算出し、`financial_metrics` テーブルに保存する `CalculateFinancialMetricsJob` を実装した。
+
+### 実施内容
+
+1. **FinancialMetric モデル拡張** (`app/models/financial_metric.rb`)
+   - `compute_yoy(current, previous)`: YoY（前年同期比）算出。分母には前期の絶対値を使用
+   - `safe_divide(numerator, denominator)`: 安全な除算（分母が0/nilの場合nil）
+   - `get_growth_metrics(current_fv, previous_fv)`: 成長性指標算出（revenue_yoy, operating_income_yoy, ordinary_income_yoy, net_income_yoy, eps_yoy）
+   - `get_profitability_metrics(fv)`: 収益性指標算出（roe, roa, operating_margin, ordinary_margin, net_margin）
+   - `get_cf_metrics(fv)`: CF指標算出（free_cf, operating_cf_positive, investing_cf_negative, free_cf_positive）
+   - `get_consecutive_metrics(growth_metrics, previous_metric)`: 連続増収増益期数算出
+   - `get_valuation_metrics(fv, stock_price)`: バリュエーション指標算出（per, pbr, psr, dividend_yield → data_json格納）
+
+2. **CalculateFinancialMetricsJob** (`app/jobs/calculate_financial_metrics_job.rb`)
+   - `recalculate` パラメータ: trueの場合全レコード再計算、falseの場合は未算出または更新されたレコードのみ
+   - `company_id` パラメータ: 特定企業のみ算出する場合に指定
+   - 前期データ検索: `fiscal_year_end` の約1年前（±1ヶ月）の範囲で検索
+   - 株価取得: 決算期末日の前後7日間で最も近い営業日の調整後終値を使用（SQLite JULIANDAY関数）
+   - 個別レコードの算出失敗時はログに記録して次のレコードへ継続
+
+3. **テスト** (`spec/models/financial_metric_spec.rb`)
+   - `.compute_yoy`: 6 examples（正/負の成長率、赤字→黒字転換、0/nil処理）
+   - `.safe_divide`: 4 examples（正常除算、0/nil分母・分子）
+   - `.get_growth_metrics`: 2 examples（全YoY指標算出、前期nil）
+   - `.get_profitability_metrics`: 2 examples（全収益性指標算出、0売上）
+   - `.get_cf_metrics`: 3 examples（正フリーCF、負フリーCF、nil値）
+   - `.get_consecutive_metrics`: 4 examples（増収時+1、減収時リセット、前期nil、YoY nil）
+   - `.get_valuation_metrics`: 2 examples（全バリュエーション指標算出、株価nil）
+
+### テスト結果
+
+- 全スイート: 101 examples, 0 failures, 5 pending
+- FinancialMetric: 23 examples, 0 failures
+- pendingはcredentials/APIキー未設定によるもの（正当なskip）
+
+### 成果物
+
+| ファイル | 内容 |
+|---------|------|
+| `app/models/financial_metric.rb` | 指標算出クラスメソッド追加 |
+| `app/jobs/calculate_financial_metrics_job.rb` | 指標算出ジョブ新規作成 |
+| `spec/models/financial_metric_spec.rb` | FinancialMetric テスト新規作成 |
+
 ## 2026-03-10 DEVELOP: 株価データ取り込みジョブ実装
 
 ### 作業概要
