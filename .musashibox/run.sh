@@ -52,7 +52,7 @@ echo -e "${GREEN}Build complete${NC}\n"
 # Run
 echo -e "${YELLOW}Starting container...${NC}\n"
 
-docker run -it --rm \
+docker run -i --rm \
     --name ${DOCKER_IMAGE_NAME} \
     -e CLAUDE_CODE_OAUTH_TOKEN -e GIT_REPO_URL \
     -e CLAUDE_CODE_EFFORT_LEVEL -e ANTHROPIC_MODEL \
