@@ -2,6 +2,55 @@
 
 Claude's development work log for this project.
 
+## 2026-03-10 THINK: 追加開発TODO作成（指標拡張・セクター分析・CLIツール）
+
+### 作業概要
+
+前回のTHINK（次期開発TODO作成）で識別された4件のpending TODOに加え、さらにプロジェクトを前進させるために不足している要素を分析し、追加のTODOを3件作成した。
+
+### 現状分析
+
+- 前回のTHINKで作成された4件のTODO（分析クエリレイヤー設計、Web API設計、ジョブスケジューリング、データ整合性チェック）はすべてpending状態
+- 14件の完了済みTODOによって、データ基盤（6テーブル、3 APIクライアント、5ジョブ）は整備済み
+- テスト: 101 examples, 0 failures, 5 pending（credentials未設定による正当なskip）
+
+### 識別した追加のギャップ
+
+既存pending TODOがカバーしていない以下の領域を発見:
+
+1. **指標算出の不完全性**
+   - `FinancialMetric.data_json` スキーマに `ev_ebitda` が定義済みだが、算出ロジックが未実装
+   - `FinancialValue.data_json` に業績予想データ（`forecast_net_sales` 等）が格納されているが、実績との比較分析（Earning Surprise）がおこなわれていない
+   - これらはスクリーニングにおいて重要な指標であり、既存パイプラインの拡張で対応可能
+
+2. **業種別比較の手段がない**
+   - `companies` に `sector_17/sector_33` データが存在するが、業種別集計の仕組みがない
+   - 個別企業のROEやPERが高いか低いかを業種平均と比較して判断できない
+   - 「注目すべき企業を一覧」するためには業種内ポジションの把握が有益
+
+3. **データ活用手段の即時的な不足**
+   - Web API完成前にデータを活用する手段が一切ない
+   - CLAUDE.mdの3つのユースケースを試行するためのツールがない
+   - rakeタスクによるCLI分析ツールで即時にデータ活用可能にできる
+
+### 作成したTODO
+
+| ファイル | 種別 | 優先度 | 内容 |
+|---------|------|--------|------|
+| `20260310_1500_dev_extend_financial_metrics_DEVELOP_pending.md` | DEVELOP | 高 | EV/EBITDA算出・業績予想乖離率（Earning Surprise）の算出ロジック追加 |
+| `20260310_1501_plan_sector_analysis_PLAN_pending.md` | PLAN | 中 | セクター・業種別分析基盤設計（業種別統計量の算出・保存・活用方法） |
+| `20260310_1502_dev_data_export_cli_DEVELOP_pending.md` | DEVELOP | 中 | CLI分析ヘルパー・データエクスポート（rakeタスクによるスクリーニング・CSV出力） |
+
+### 推奨される作業順序（既存pending TODO含む全体）
+
+1. **分析クエリレイヤー設計**（PLAN）→ 詳細設計書に基づく実装（DEVELOP）
+2. **指標算出拡張**（DEVELOP）← NEW: 既存パイプライン拡張のため独立して並行可能
+3. **Web API設計**（PLAN）→ 詳細設計書に基づく実装（DEVELOP）※ 分析クエリレイヤーに依存
+4. **CLI分析ツール**（DEVELOP）← NEW: 分析クエリレイヤー実装後
+5. **ジョブスケジューリング・初期データロード**（DEVELOP）※ 独立して並行可能
+6. **データ整合性チェック**（DEVELOP）※ 独立して並行可能
+7. **セクター分析基盤設計**（PLAN）→ 実装（DEVELOP）※ 指標算出拡張の後が望ましい
+
 ## 2026-03-10 THINK: 次期開発TODO作成
 
 ### 作業概要
