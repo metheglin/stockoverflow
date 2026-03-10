@@ -1,2 +1,5 @@
 ssh-keys/
 .env*
+
+/log/*
+!/log/.keep
