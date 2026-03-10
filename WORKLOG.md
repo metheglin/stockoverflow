@@ -2,6 +2,50 @@
 
 Claude's development work log for this project.
 
+## 2026-03-10 DEVELOP: 株価データ取り込みジョブ実装
+
+### 作業概要
+
+JQUANTSの株価四本値API (`/v2/equities/bars/daily`) から日次株価データを取得し、`daily_quotes` テーブルに保存する `ImportDailyQuotesJob` を実装した。
+
+### 実施内容
+
+1. **DailyQuote モデル拡張** (`app/models/daily_quote.rb`)
+   - `JQUANTS_FIELD_MAP`: V2 bars/dailyフィールド → daily_quotesカラムの対応マッピング（8フィールド: O, H, L, C, Vo, Va, AdjFactor, AdjC）
+   - `JQUANTS_DATA_JSON_FIELDS`: data_jsonに格納するフィールド（AdjO, AdjH, AdjL, AdjVo）
+   - `INTEGER_COLUMNS`: 整数変換するカラム（volume, turnover_value）
+   - `DailyQuote.get_attributes_from_jquants(data)`: JQUANTSレスポンスから属性Hashを生成するクラスメソッド
+
+2. **ImportDailyQuotesJob** (`app/jobs/import_daily_quotes_job.rb`)
+   - 2つの実行モード: 差分更新（デフォルト）、全件取得（`full: true`）
+   - 差分更新: 最終同期日から当日まで日付指定モードで取得。土日は自動スキップ
+   - 全件取得: 全上場企業について銘柄指定で過去データを取得。レート制限対応（`SLEEP_BETWEEN_COMPANIES = 1`）
+   - `from_date`, `to_date` パラメータで取得期間を指定可能
+   - `api_key` パラメータ対応: nilの場合はcredentialsから取得
+   - `application_properties`（kind: `jquants_sync`）で最終同期日を管理
+   - 個別レコードの失敗時はログに記録して次のレコードへ継続
+
+3. **テスト** (`spec/models/daily_quote_spec.rb`)
+   - `DailyQuote.get_attributes_from_jquants`: 4 examples
+     - 固定カラム8フィールドの変換検証
+     - data_json 4フィールドの変換検証
+     - volume/turnover_valueの整数変換検証
+     - nil値のスキップ検証
+
+### テスト結果
+
+- 全スイート: 78 examples, 0 failures, 5 pending
+- DailyQuote: 4 examples, 0 failures
+- pendingはcredentials/APIキー未設定によるもの（正当なskip）
+
+### 成果物
+
+| ファイル | 内容 |
+|---------|------|
+| `app/models/daily_quote.rb` | JQUANTS フィールドマッピング定数・属性変換メソッド追加 |
+| `app/jobs/import_daily_quotes_job.rb` | 株価データ取り込みジョブ新規作成 |
+| `spec/models/daily_quote_spec.rb` | DailyQuote テスト新規作成 |
+
 ## 2026-03-10 DEVELOP: EDINET決算データ取り込みジョブ実装
 
 ### 作業概要
