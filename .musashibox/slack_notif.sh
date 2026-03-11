@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-set -u
+set -e
 
 # * * * * * * * * * * * * * * * * * * * * * * * * 
 # Please set SLACK_WEBHOOK_URL in musashibox .env

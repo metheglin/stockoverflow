@@ -26,11 +26,12 @@ fi
 # SSH Setup
 # ========================
 if [ ! -f "ssh-keys/id_ed25519" ]; then
-    echo -e "${RED}Error: SSH key not found!${NC}"
-    echo ""
-    echo "  Run ./setup-keys.sh first to generate SSH keys,"
-    echo "  then register the public key on GitHub."
-    exit 1
+  echo -e "${RED}Error: SSH key not found!${NC}"
+  echo ""
+  echo "  Run ./setup-keys.sh first to generate SSH keys,"
+  echo "  then register the public key on GitHub."
+  $SCRIPT_DIR/.musashibox/slack_notif.sh "[musashibox]${PROJECT_NAME}" "Error: SSH key not found at $HOME_DIR/.ssh-keys/" "#E01F4C"
+  exit 1
 fi
 
 # ========================
@@ -40,8 +41,9 @@ DOCKER_IMAGE_NAME=musashibox-stockoverflow
 DOCKER_TAG_NAME="${DOCKER_IMAGE_NAME}:latest"
 
 if ! command -v docker &> /dev/null; then
-    echo -e "${RED}Error: Docker is not installed${NC}"
-    exit 1
+  echo -e "${RED}Error: Docker is not installed${NC}"
+  $SCRIPT_DIR/.musashibox/slack_notif.sh "[musashibox]${PROJECT_NAME}" "Docker is not installed" "#E01F4C"
+  exit 1
 fi
 
 # Build
