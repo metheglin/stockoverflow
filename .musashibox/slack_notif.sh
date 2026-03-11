@@ -15,6 +15,7 @@ COLOR=${3:-"#74F40B"}
 PAYLOAD=$(cat <<EOF
 {
   "text": "$SUBJECT",
+  "icon_emoji": ":self-care:",
   "attachments": [
     {
       "color": "$COLOR",
