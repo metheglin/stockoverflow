@@ -54,6 +54,7 @@ echo -e "${YELLOW}Starting container...${NC}\n"
 
 docker run -i --rm \
     --name ${DOCKER_IMAGE_NAME} \
+    -e PROJECT_NAME \
     -e CLAUDE_CODE_OAUTH_TOKEN -e GIT_REPO_URL \
     -e CLAUDE_CODE_EFFORT_LEVEL -e ANTHROPIC_MODEL \
     -v "$(pwd)/ssh-keys:/home/sandbox/.ssh-keys:ro" \
