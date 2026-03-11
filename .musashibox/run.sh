@@ -37,7 +37,7 @@ fi
 # ========================
 # DOCKER Run
 # ========================
-DOCKER_IMAGE_NAME=musashibox-stockoverflow
+DOCKER_IMAGE_NAME="musashibox-${PROJECT_NAME}"
 DOCKER_TAG_NAME="${DOCKER_IMAGE_NAME}:latest"
 
 if ! command -v docker &> /dev/null; then
