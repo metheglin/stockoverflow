@@ -1,5 +1,5 @@
-#!/bin/bash
-set -e
+#!/usr/bin/env bash
+set -u
 
 # * * * * * * * * * * * * * * * * * * * * * * * * 
 # Please set SLACK_WEBHOOK_URL in musashibox .env
@@ -24,6 +24,7 @@ PAYLOAD=$(cat <<EOF
 }
 EOF
 )
+echo $SLACK_WEBHOOK_URL
 echo "${PAYLOAD}"
 
 curl -X POST -H 'Content-type: application/json' --data "${PAYLOAD}" "${SLACK_WEBHOOK_URL}"
