@@ -8,15 +8,17 @@ tmp_log="$(mktemp)"
 cleanup() {
   status="$1"
   local message=$(tail -n1 "$tmp_log")
+  # local content=$(jq -Rs . $tmp_log | jq -r .)
+  local content=$(cat "$tmp_log" | jq -Rs . | sed 's/^"//;s/"$//')
   local meta="TODO_TYPE=${TODO_TYPE}, TODO_FILE=${TODO_FILE}, GIT_REPO_URL=${GIT_REPO_URL}"
 
   if [ "$status" -ne 0 ]; then
-    ${PROJECT_DIR}/.musashibox/slack_notif.sh "${meta}: ${message}" "$(cat $tmp_log)" "#E01F4C"
+    ${PROJECT_DIR}/.musashibox/slack_notif.sh "${meta}: ${message}" "$content" "#E01F4C"
   else
-    ${PROJECT_DIR}/.musashibox/slack_notif.sh "${meta}: ${message}" "$(cat $tmp_log)" "#74F40B"
+    ${PROJECT_DIR}/.musashibox/slack_notif.sh "${meta}: ${message}" "$content" "#74F40B"
   fi
 
-  cat "$tmp_log"
+  # cat "$tmp_log"
   rm -f "$tmp_log"
 }
 
@@ -33,7 +35,7 @@ forward_signal() {
 trap 'forward_signal TERM' TERM
 trap 'forward_signal INT' INT
 
-/usr/local/bin/entrymain.sh "$@" > "$tmp_log" 2>&1 &
+/usr/local/bin/entrymain.sh "$@" 2> "$tmp_log" &
 child_pid=$!
 
 status=0
