@@ -26,7 +26,7 @@ PAYLOAD=$(cat <<EOF
 }
 EOF
 )
-# echo $SLACK_WEBHOOK_URL
-# echo "${PAYLOAD}"
+echo $SLACK_WEBHOOK_URL
+echo "${PAYLOAD}"
 
 curl -X POST -H 'Content-type: application/json' --data "${PAYLOAD}" "${SLACK_WEBHOOK_URL}"
