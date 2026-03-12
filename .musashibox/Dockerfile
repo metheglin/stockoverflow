@@ -23,6 +23,8 @@ RUN mkdir -p /workspace/project && chown -R sandbox:sandbox /workspace
 RUN mkdir -p /config && chown sandbox:sandbox /config
 
 # Entrypoint script
+COPY entrymain.sh /usr/local/bin/entrymain.sh
+RUN chmod +x /usr/local/bin/entrymain.sh
 COPY entrypoint.sh /usr/local/bin/entrypoint.sh
 RUN chmod +x /usr/local/bin/entrypoint.sh
 
