@@ -2,6 +2,51 @@
 
 Claude's development work log for this project.
 
+## 2026-03-12 BUGFIX: ImportJquantsFinancialDataJob 429エラー修正
+
+### 作業概要
+
+`ImportJquantsFinancialDataJob.perform_now` 実行時に大半のAPIリクエストが429（Too Many Requests）エラーで失敗する問題を修正した。
+
+### 原因分析
+
+2つの原因が重なっていた:
+
+1. **JquantsApi のリトライ設定不備**: faraday-retry の `exceptions` リストに `Faraday::TooManyRequestsError` が含まれていなかったため、429レスポンスが即座に例外として発生し、リトライされなかった。`retry_statuses` オプションは `raise_error` ミドルウェアとの併用時に機能しない（`raise_error` が先に例外を発生させるため）。
+
+2. **ジョブのレート制限対策の欠如**: `ImportJquantsFinancialDataJob` の `import_incremental`（日付ごとのループ）と `import_full`（企業ごとのループ）で、API呼び出し間にsleepが一切なく、短時間に大量のリクエストが送信されていた。
+
+### 修正内容
+
+1. **`app/lib/jquants_api.rb`** - faraday-retry設定修正
+   - `exceptions` に `Faraday::TooManyRequestsError` を追加し、429レスポンス時にリトライが発生するようにした
+   - `max` を 2 → 4 に増加、`interval` を 3 → 2 に調整し、exponential backoff（2, 4, 8, 16秒）で429回復を待つ設計に変更
+
+2. **`app/jobs/import_jquants_financial_data_job.rb`** - レート制限対策追加
+   - `SLEEP_BETWEEN_REQUESTS = 1` 定数を追加
+   - `import_incremental` と `import_full` の両モードでAPI呼び出し間にsleepを挿入
+
+3. **`app/jobs/import_daily_quotes_job.rb`** - 同パターンの予防修正
+   - `import_incremental` モードにも同様のsleepを追加（`import_full` は既に `SLEEP_BETWEEN_COMPANIES` 対応済み）
+
+4. **`spec/lib/jquants_api_spec.rb`** - 429リトライテスト追加
+   - Faradayスタブで初回429→2回目200のシナリオを検証するテストを追加
+
+### テスト結果
+
+- 全スイート: 102 examples, 0 failures, 5 pending
+- JquantsApi: 12 examples, 0 failures, 4 pending（credentials未設定による正当なskip）
+- 新規テスト: 429リトライ動作確認 1 example
+
+### 成果物
+
+| ファイル | 内容 |
+|---------|------|
+| `app/lib/jquants_api.rb` | faraday-retry 429リトライ設定修正 |
+| `app/jobs/import_jquants_financial_data_job.rb` | SLEEP_BETWEEN_REQUESTS追加 |
+| `app/jobs/import_daily_quotes_job.rb` | incremental モードにsleep追加 |
+| `spec/lib/jquants_api_spec.rb` | 429リトライテスト追加 |
+
 ## 2026-03-12 PLAN: 分析クエリレイヤー設計
 
 ### 作業概要

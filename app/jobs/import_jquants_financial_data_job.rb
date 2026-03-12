@@ -1,4 +1,6 @@
 class ImportJquantsFinancialDataJob < ApplicationJob
+  SLEEP_BETWEEN_REQUESTS = 1  # API呼び出し間の待機秒数（レート制限対策）
+
   # JQUANTS財務情報サマリーを取り込む
   #
   # @param full [Boolean] trueの場合全上場企業の全期間を取得、falseの場合差分のみ
@@ -25,10 +27,11 @@ class ImportJquantsFinancialDataJob < ApplicationJob
 
   # 全上場企業について銘柄指定で全期間取得
   def import_full
-    Company.listed.find_each do |company|
+    Company.listed.find_each.with_index do |company, index|
       next if company.securities_code.blank?
 
       begin
+        sleep(SLEEP_BETWEEN_REQUESTS) if index > 0
         statements = @client.load_financial_statements(code: company.securities_code)
         statements.each { |data| import_statement(data, company: company) }
       rescue => e
@@ -44,8 +47,11 @@ class ImportJquantsFinancialDataJob < ApplicationJob
   def import_incremental
     start_date = get_last_synced_date
     end_date = Date.current
+    first_request = true
 
     (start_date..end_date).each do |date|
+      sleep(SLEEP_BETWEEN_REQUESTS) unless first_request
+      first_request = false
       import_by_date(date)
     end
   end

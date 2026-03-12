@@ -170,7 +170,12 @@ class JquantsApi
   def build_connection
     Faraday.new(url: BASE_URL) do |conn|
       conn.headers["x-api-key"] = @api_key
-      conn.request :retry, max: 2, interval: 3, backoff_factor: 2
+      conn.request :retry,
+        max: 4,
+        interval: 2,
+        backoff_factor: 2,
+        exceptions: Faraday::Retry::Middleware::DEFAULT_EXCEPTIONS +
+                    [Faraday::TooManyRequestsError]
       conn.response :raise_error
       conn.adapter Faraday.default_adapter
     end

@@ -144,6 +144,42 @@ RSpec.describe JquantsApi do
       end
     end
 
+    describe "429レート制限のリトライ" do
+      it "429レスポンスをリトライして成功する" do
+        retry_client = JquantsApi.new(api_key: api_key)
+        retry_stubs = Faraday::Adapter::Test::Stubs.new
+
+        call_count = 0
+        retry_stubs.get("/v2/fins/summary") do
+          call_count += 1
+          if call_count == 1
+            [429, { "Content-Type" => "application/json" }, "Rate limit exceeded"]
+          else
+            [200, { "Content-Type" => "application/json" },
+             { "data" => [{ "Code" => "86970" }] }.to_json]
+          end
+        end
+
+        retry_connection = Faraday.new(url: JquantsApi::BASE_URL) do |conn|
+          conn.headers["x-api-key"] = api_key
+          conn.request :retry,
+            max: 4,
+            interval: 0.01,
+            backoff_factor: 2,
+            exceptions: Faraday::Retry::Middleware::DEFAULT_EXCEPTIONS +
+                        [Faraday::TooManyRequestsError]
+          conn.response :raise_error
+          conn.adapter :test, retry_stubs
+        end
+        retry_client.instance_variable_set(:@connection, retry_connection)
+
+        result = retry_client.load_financial_statements(code: "86970")
+        expect(result).to be_an(Array)
+        expect(result.first["Code"]).to eq("86970")
+        expect(call_count).to eq(2)
+      end
+    end
+
     describe ".default" do
       it "credentialsのAPIキーでインスタンスを生成できる" do
         skip "credentials not configured" unless Rails.application.credentials.dig(:jquants, :api_key)

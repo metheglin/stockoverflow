@@ -50,12 +50,15 @@ class ImportDailyQuotesJob < ApplicationJob
   def import_incremental(from_date: nil, to_date: nil)
     start_date = from_date ? Date.parse(from_date) : get_last_synced_date
     end_date = to_date ? Date.parse(to_date) : Date.current
+    first_request = true
 
     (start_date..end_date).each do |date|
       # 土日はスキップ（株式市場は営業日のみ）
       next if date.saturday? || date.sunday?
 
       begin
+        sleep(SLEEP_BETWEEN_COMPANIES) unless first_request
+        first_request = false
         quotes = @client.load_daily_quotes(date: date.strftime("%Y%m%d"))
         import_quotes(quotes)
       rescue => e
