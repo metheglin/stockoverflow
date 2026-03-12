@@ -1,0 +1,8 @@
+# ImportJquantsFinancialDataJob 429エラー
+
+以下のTODOでの対応について、基本解消していない。
+
+`20260312_0644_error_jquants_financial_data_DEVELOP_done.md`
+
+429のエラーが繰り返されて失敗するとき、次の日付に行っては必ずもれが発生する。そこで失敗してくれた方が次の実行時に続きから開始できるので使いやすい。設計を見直して。
+また必要な十分のsleepをいれてもかまわない。
