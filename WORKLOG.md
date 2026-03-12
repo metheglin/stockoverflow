@@ -2,6 +2,67 @@
 
 Claude's development work log for this project.
 
+## 2026-03-12 PLAN: 分析クエリレイヤー設計
+
+### 作業概要
+
+蓄積されたデータを分析・活用するためのクエリインターフェースの詳細設計をおこなった。CLAUDE.mdの3つのユースケースに対応するQueryObjectクラスと、将来の拡張に耐えうる汎用スクリーニング機能を設計した。
+
+### 現状分析
+
+- `companies`, `financial_values`, `financial_metrics`, `daily_quotes` の4テーブルにデータ蓄積基盤は整備済み
+- `FinancialMetric` には連続増収増益期数、CF指標（boolean）、YoY成長率、収益性指標が格納済み
+- しかしデータを分析するためのscope、QueryObject、時系列取得インターフェースが一切存在しない
+
+### 設計内容
+
+#### 1. モデル scope の追加
+
+**FinancialMetric** (4 scope):
+- `consolidated_annual`: 連結・通期の基本フィルタ
+- `latest_period`: 企業ごとの最新期をサブクエリで取得
+- `consecutive_growth(min_periods:)`: 連続増収増益フィルタ（既存DBインデックス活用）
+- `healthy_cf`: 営業CF正・投資CF負のフィルタ
+
+**Company** (3 scope):
+- `by_sector_17(code)`: 17業種フィルタ
+- `by_sector_33(code)`: 33業種フィルタ
+- `by_market(code)`: 市場区分フィルタ
+
+#### 2. QueryObject クラス設計
+
+| クラス名 | 配置先 | ユースケース | 概要 |
+|---------|--------|------------|------|
+| `Company::ConsecutiveGrowthQuery` | `app/models/company/` | UC1 | N期連続増収増益企業を増収率順に一覧 |
+| `Company::CashFlowTurnaroundQuery` | `app/models/company/` | UC2 | フリーCFがマイナス→プラスに転換した企業を検出 |
+| `Company::FinancialTimelineQuery` | `app/models/company/` | UC3 | 特定企業の財務数値・指標の時系列推移を取得 |
+| `Company::ScreeningQuery` | `app/models/company/` | 汎用 | パラメータベースの汎用スクリーニング |
+
+#### 3. DBインデックス追加
+
+- `financial_metrics`: CF条件の複合インデックス `(operating_cf_positive, investing_cf_negative, free_cf_positive)`
+- `companies`: `sector_33_code`, `market_code` の単独インデックス
+
+#### 4. 主要設計判断
+
+- **前期比較はRubyレベル**: SQLite自己結合よりテスタビリティ・明快さを優先。最新期の企業数（最大約4,000件）でN+1のコストは許容範囲
+- **latest_period scopeはサブクエリ方式**: `WHERE fiscal_year_end = (SELECT MAX(...) ...)` で効率的に最新期を取得
+- **汎用ScreeningQueryはホワイトリスト方式**: フィルタ可能カラムを定数で定義しSQLインジェクション防止。Web APIパラメータとの自然な対応を想定
+- **QueryObject配置先**: `app/models/company/` 配下に `Query` suffix付きで配置（rails.md規約準拠）
+
+### テスト計画
+
+- scopeテストは記述しない（testing.md規約準拠）
+- QueryObject 4クラスについてテスト記述: 合計約17テスト項目を予定
+- `extract_values` / `extract_metrics` / `load_previous_metric` / `apply_filters` / `build_scope` などの公開メソッドを重点テスト
+
+### 成果物
+
+| ファイル | 内容 |
+|---------|------|
+| `todo/20260312_1000_dev_analysis_query_layer_DEVELOP_pending.md` | 分析クエリレイヤー詳細実装仕様書（DEVELOP TODO） |
+| `todo/20260310_1400_plan_analysis_query_layer_PLAN_done.md` | 元PLANのステータスをdoneに変更 |
+
 ## 2026-03-11 PLAN: データ量推計レポート作成
 
 ### 作業概要
