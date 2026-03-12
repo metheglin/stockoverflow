@@ -2,6 +2,62 @@
 
 Claude's development work log for this project.
 
+## 2026-03-12 BUGFIX: ImportJquantsFinancialDataJob 429エラー時のデータ欠損防止
+
+### 作業概要
+
+`ImportJquantsFinancialDataJob` において、429エラー（レート制限）がリトライ後も解消されない場合にジョブが次の日付に進んでしまい、データの欠損が発生する問題を修正した。
+
+### 原因分析
+
+前回の429エラー対策（faraday-retry設定修正・sleep追加）によりリトライは機能するようになったが、リトライが上限に達した場合の動作に問題が残っていた:
+
+1. **`import_by_date` が全エラーをrescue**: APIエラー（429含む）が発生しても例外を握りつぶし、次の日付へ進行してしまう
+2. **`record_sync_date` が常に `Date.current` を記録**: エラーで一部日付がスキップされても同期ポインタが当日まで進むため、次回実行時にスキップされた日付が永久に取り込まれない
+
+### 修正内容
+
+1. **`import_by_date`** - エラーrescueを除去
+   - APIエラー（429等）を呼び出し元に伝播させ、ジョブを停止させる設計に変更
+   - 個別レコードの処理エラーは `import_statement` 内で引き続きrescue
+
+2. **`import_incremental`** - 最終成功日付の追跡
+   - `@last_successful_date` で最後に成功した日付を追跡
+   - `ensure` ブロックで最終成功日付まで同期日を記録（エラー時も正常時も）
+   - 次回実行時は最終成功日付から再開されるため、データ欠損が発生しない
+
+3. **`import_full`** - 429エラーの再raise
+   - `Faraday::TooManyRequestsError` を明示的に再raiseし、ジョブを停止
+   - その他のエラー（個別企業のAPI障害等）は従来どおりrescueして継続
+
+4. **`perform`** - 構造変更
+   - `record_sync_date` をモード別に適切なタイミングで呼び出し
+   - `log_result` を `ensure` ブロックに移動し、エラー時もログが出力される設計に
+
+5. **`record_sync_date`** - date引数の追加
+   - 任意の日付を記録できるよう引数を追加（デフォルトは当日）
+
+6. **`SLEEP_BETWEEN_REQUESTS`** - 1秒 → 2秒に増加
+   - レート制限到達の頻度を低減
+
+### 設計判断
+
+- **429エラーはジョブ停止**: レート制限エラーはリトライ不可能な状態を示すため、無視して次に進むのではなくジョブを停止する。次回実行時に続きから再開できる方が運用上有用
+- **同期日の記録にensureを使用**: 正常完了時も異常終了時も、最後に成功した日付まで確実に記録される
+- **import_statementのrescueは維持**: 個別レコードの処理エラー（データ不整合等）はジョブ全体を止める必要がないため従来どおり
+
+### テスト結果
+
+- 全スイート: 102 examples, 0 failures, 5 pending
+- pendingはcredentials/APIキー未設定によるもの（正当なskip）
+- テスティング規約により、ジョブの稼働テストは記述しない
+
+### 成果物
+
+| ファイル | 内容 |
+|---------|------|
+| `app/jobs/import_jquants_financial_data_job.rb` | 429エラー時のデータ欠損防止修正 |
+
 ## 2026-03-12 BUGFIX: ImportJquantsFinancialDataJob 429エラー修正
 
 ### 作業概要
