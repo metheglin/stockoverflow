@@ -1,5 +1,5 @@
 class ImportJquantsFinancialDataJob < ApplicationJob
-  SLEEP_BETWEEN_REQUESTS = 1  # API呼び出し間の待機秒数（レート制限対策）
+  SLEEP_BETWEEN_REQUESTS = 2  # API呼び出し間の待機秒数（レート制限対策）
 
   # JQUANTS財務情報サマリーを取り込む
   #
@@ -13,19 +13,21 @@ class ImportJquantsFinancialDataJob < ApplicationJob
 
     if target_date
       import_by_date(target_date)
+      record_sync_date
     elsif full
       import_full
+      record_sync_date
     else
       import_incremental
     end
-
-    record_sync_date
+  ensure
     log_result
   end
 
   private
 
   # 全上場企業について銘柄指定で全期間取得
+  # 429エラー（レート制限）発生時はジョブを停止する
   def import_full
     Company.listed.find_each.with_index do |company, index|
       next if company.securities_code.blank?
@@ -34,6 +36,8 @@ class ImportJquantsFinancialDataJob < ApplicationJob
         sleep(SLEEP_BETWEEN_REQUESTS) if index > 0
         statements = @client.load_financial_statements(code: company.securities_code)
         statements.each { |data| import_statement(data, company: company) }
+      rescue Faraday::TooManyRequestsError
+        raise
       rescue => e
         @stats[:errors] += 1
         Rails.logger.error(
@@ -44,28 +48,29 @@ class ImportJquantsFinancialDataJob < ApplicationJob
   end
 
   # 差分取得: 最終同期日から今日まで日付指定で取得
+  # APIエラー発生時は最後に成功した日付まで同期日を記録し、ジョブを停止する
   def import_incremental
     start_date = get_last_synced_date
     end_date = Date.current
+    @last_successful_date = nil
     first_request = true
 
     (start_date..end_date).each do |date|
       sleep(SLEEP_BETWEEN_REQUESTS) unless first_request
       first_request = false
       import_by_date(date)
+      @last_successful_date = date
     end
+  ensure
+    record_sync_date(@last_successful_date) if @last_successful_date
   end
 
   # 指定日の全銘柄決算データを取得
+  # APIエラー（429等）は呼び出し元に伝播させ、ジョブを停止させる
   def import_by_date(date)
     date = Date.parse(date.to_s) unless date.is_a?(Date)
     statements = @client.load_financial_statements(date: date.strftime("%Y%m%d"))
     statements.each { |data| import_statement(data) }
-  rescue => e
-    @stats[:errors] += 1
-    Rails.logger.error(
-      "[ImportJquantsFinancialDataJob] API error for date #{date}: #{e.message}"
-    )
   end
 
   # 1件の財務情報サマリーを取り込む
@@ -169,9 +174,12 @@ class ImportJquantsFinancialDataJob < ApplicationJob
   end
 
   # 最終同期日を記録
-  def record_sync_date
+  #
+  # @param date [Date] 記録する同期日。デフォルトは当日
+  def record_sync_date(date = Date.current)
+    return if date.nil?
     prop = ApplicationProperty.find_or_create_by!(kind: :jquants_sync)
-    prop.last_synced_date = Date.current.iso8601
+    prop.last_synced_date = date.iso8601
     prop.save!
   end
 
