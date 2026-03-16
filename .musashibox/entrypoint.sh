@@ -4,18 +4,20 @@ set -e
 PROJECT_DIR="/workspace/project"
 child_pid=""
 tmp_log="$(mktemp)"
+tmp_message="$(mktemp)"
 
 cleanup() {
   status="$1"
-  local message=$(tail -n1 "$tmp_log")
+  # local message=$(tail -n1 "$tmp_log")
   # local content=$(jq -Rs . $tmp_log | jq -r .)
+  local message=$(cat "$tmp_message" | jq -Rs . | sed 's/^"//;s/"$//')
   local content=$(cat "$tmp_log" | jq -Rs . | sed 's/^"//;s/"$//')
-  local meta="TODO_TYPE=${TODO_TYPE}, TODO_FILE=${TODO_FILE}, GIT_REPO_URL=${GIT_REPO_URL}"
+  # local meta="TODO_TYPE=${TODO_TYPE}, TODO_FILE=${TODO_FILE}, GIT_REPO_URL=${GIT_REPO_URL}"
 
   if [ "$status" -ne 0 ]; then
-    ${PROJECT_DIR}/.musashibox/slack_notif.sh "${meta}: ${message}" "$content" "#E01F4C"
+    ${PROJECT_DIR}/.musashibox/slack_notif.sh "${message}" "$content" "#E01F4C"
   else
-    ${PROJECT_DIR}/.musashibox/slack_notif.sh "${meta}: ${message}" "$content" "#74F40B"
+    ${PROJECT_DIR}/.musashibox/slack_notif.sh "${message}" "Done. Check WORKLOG.md" "#74F40B"
   fi
 
   # cat "$tmp_log"
@@ -35,7 +37,7 @@ forward_signal() {
 trap 'forward_signal TERM' TERM
 trap 'forward_signal INT' INT
 
-/usr/local/bin/entrymain.sh "$@" 2> "$tmp_log" &
+/usr/local/bin/entrymain.sh "$tmp_message" "$@" 2> "$tmp_log" &
 child_pid=$!
 
 status=0

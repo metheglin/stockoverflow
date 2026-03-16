@@ -9,10 +9,13 @@ CYAN='\033[0;36m'
 NC='\033[0m'
 
 PROJECT_DIR="/workspace/project"
+tmp_message=${1}
 
 echo -e "${CYAN}========================================${NC}"
 echo -e "${CYAN}  musashibox Starting ${date}           ${NC}"
 echo -e "${CYAN}========================================${NC}"
+
+echo "GIT_REPO_URL=$GIT_REPO_URL" >> $tmp_message
 
 # -----------------------------------------
 # Step 1: SSH config (keys are mounted from host)
@@ -21,8 +24,7 @@ echo -e "\n${YELLOW}[1/4] SSH setup...${NC}"
 
 if [ ! -f "$HOME_DIR/.ssh-keys/id_ed25519" ]; then
   echo -e "${RED}  Error: SSH key not found at $HOME_DIR/.ssh-keys/${NC}" >&2
-  echo "SSH key not found: Run setup-keys.sh on the host first." >&2
-  # ${PROJECT_DIR}/.musashibox/slack_notif.sh "[musashibox]${PROJECT_NAME}" "Error: SSH key not found at $HOME_DIR/.ssh-keys/" "#E01F4C"
+  echo "SSH key not found: Run setup-keys.sh on the host first." | tee $tmp_message >&2
   exit 1
 fi
 
@@ -51,6 +53,7 @@ echo -e "\n${YELLOW}[3/4] Git repository...${NC}"
 
 git config --global user.email "musashibox@example.com"
 git config --global user.name "musashibox"
+ssh-keyscan -H github.com >> ~/.ssh/known_hosts
 
 if [ -n "$GIT_REPO_URL" ]; then
   if [ -d "$PROJECT_DIR/.git" ]; then
@@ -81,8 +84,7 @@ OUT="$("${PROJECT_DIR}/.musashibox/find_next_todo.sh")"
 echo $OUT
 
 [ -n "${OUT}" ] || {
-  echo "Nothing to do 🙄 Please review pending todos." >&2
-  # ${PROJECT_DIR}/.musashibox/slack_notif.sh "[musashibox]${PROJECT_NAME}" "Nothing to do 🙄 Please review pending todos. $GIT_REPO_URL" "#F6C709"
+  echo "Nothing to do 🙄 Please review pending todos." | tee $tmp_message >&2
   exit 0
 }
 
@@ -90,6 +92,8 @@ echo $OUT
 #    例: DEVELOP:path/to/todo1.md
 TODO_TYPE="$(echo $OUT | cut -d: -f1)"
 TODO_FILE="$(echo $OUT | cut -d: -f2)"
+
+echo "TODO_TYPE=$TODO_TYPE, TODO_FILE=$TODO_FILE" >> $tmp_message
 
 # 3) TODO_TYPE に応じて出力
 case "${TODO_TYPE}" in
@@ -106,7 +110,7 @@ case "${TODO_TYPE}" in
     exec claude --dangerously-skip-permissions -p "$COMMAND"
     ;;
   *)
-    echo "Unknown TODO_TYPE=${TODO_TYPE}" >&2
+    echo "Unknown TODO_TYPE=${TODO_TYPE}" | tee $tmp_message >&2
     # ${PROJECT_DIR}/.musashibox/slack_notif.sh "[musashibox]${PROJECT_NAME}" "Unknown TODO_TYPE=${TODO_TYPE}" "#E01F4C"
     exit 1
     :
