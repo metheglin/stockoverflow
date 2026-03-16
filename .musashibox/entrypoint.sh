@@ -12,9 +12,9 @@ cleanup() {
   local content=$(cat "$tmp_log" | jq -Rs . | sed 's/^"//;s/"$//')
 
   if [ "$status" -ne 0 ]; then
-    ${PROJECT_DIR}/.musashibox/slack_notif.sh "${message}" "$content" "#E01F4C"
-  else
     ${PROJECT_DIR}/.musashibox/slack_notif.sh "${message}" "Done. Check WORKLOG.md" "#74F40B"
+  else
+    ${PROJECT_DIR}/.musashibox/slack_notif.sh "${message}" "$content" "#E01F4C"
   fi
 
   # cat "$tmp_log"
