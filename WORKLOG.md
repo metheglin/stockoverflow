@@ -2,6 +2,65 @@
 
 Claude's development work log for this project.
 
+## 2026-03-16 DEVELOP: データ整合性チェック・モニタリング
+
+### 作業概要
+
+データ取り込みの整合性を検証し、取り込み漏れやデータ不整合を検知するための `DataIntegrityCheckJob` を実装した。チェックロジックはモデルメソッドとして切り出し、ユニットテストを記述した。
+
+### 実施内容
+
+1. **ApplicationProperty モデル拡張** (`app/models/application_property.rb`)
+   - `data_integrity: 3` kindを追加（チェック結果の保存先）
+   - `SYNC_STALE_THRESHOLD_DAYS = 3` 定数を追加
+   - `ApplicationProperty.get_sync_staleness(last_synced_date, reference_date:, threshold_days:)`: 同期日の鮮度判定メソッド
+
+2. **FinancialMetric モデル拡張** (`app/models/financial_metric.rb`)
+   - `FinancialMetric.detect_consecutive_anomalies(metrics)`: 連続増収増益期数の整合性検証メソッド。fiscal_year_end昇順のメトリクス配列を受け取り、不整合を検出して返す
+   - `FinancialMetric.get_expected_consecutive(previous_count, yoy)`: 前期の連続期数とYoYから期待される連続期数を算出するヘルパー
+
+3. **DataIntegrityCheckJob** (`app/jobs/data_integrity_check_job.rb`)
+   - 4つの整合性チェック:
+     - `check_missing_metrics`: financial_valuesに対応するfinancial_metricsが存在しないレコードの検出（算出漏れ）
+     - `check_missing_daily_quotes`: 上場企業に対して直近のdaily_quotesが存在しないケースの検出（株価取り込み漏れ）
+     - `check_consecutive_growth_integrity`: consecutive_revenue_growth / consecutive_profit_growthの連番整合性チェック
+     - `check_sync_freshness`: application_propertiesのlast_synced_dateが古すぎないかの検出（同期停止検出）
+   - 集計サマリーレポート生成（`generate_summary`）:
+     - 上場企業数、financial_valuesレコード数（通期/四半期別）、financial_metrics算出済みレコード数、daily_quotesの最新取得日、各ソース（EDINET/JQUANTS）からの取り込みレコード数
+   - 結果は `ApplicationProperty` (kind: `data_integrity`) の `data_json` に保存
+   - 構造化ログ: 検出された問題をJSON形式で出力し、後から集計・検索しやすい形式に整理
+
+4. **テスト**
+   - `spec/models/application_property_spec.rb`: 新規作成（6 examples）
+     - `.get_sync_staleness`: 閾値以内/超過/境界値/nil/Date型/カスタム閾値
+   - `spec/models/financial_metric_spec.rb`: 追加（11 examples）
+     - `.get_expected_consecutive`: 正のYoY/負のYoY/0/nil/前期0の5パターン
+     - `.detect_consecutive_anomalies`: 正常シーケンス/リセット含む正常/飛び検出/未リセット検出/1要素/空配列の6パターン
+
+### 設計判断
+
+- **チェックロジックのモデルメソッド切り出し**: テスティング規約に従い、DB不要で純粋にテストできるロジック（`get_sync_staleness`, `detect_consecutive_anomalies`, `get_expected_consecutive`）をモデルのクラスメソッドとして切り出し
+- **ジョブの稼働テストは記述しない**: テスティング規約準拠。DB依存のチェックメソッド（`check_missing_metrics`等）はジョブ内に配置し、テスト対象外
+- **構造化ログ**: JSON形式でログ出力することで、後からの集計・検索を容易にする。issueのseverityに応じてlogレベル（error/warn）を使い分け
+- **ApplicationProperty活用**: チェック結果を`data_integrity` kindのレコードとして保存し、最新のデータ状態を常に把握可能に
+
+### テスト結果
+
+- 全スイート: 119 examples, 0 failures, 5 pending
+- ApplicationProperty: 6 examples, 0 failures
+- FinancialMetric (新規追加分): 11 examples, 0 failures
+- pendingはcredentials/APIキー未設定によるもの（正当なskip）
+
+### 成果物
+
+| ファイル | 内容 |
+|---------|------|
+| `app/models/application_property.rb` | data_integrity kind追加、get_sync_stalenessメソッド追加 |
+| `app/models/financial_metric.rb` | detect_consecutive_anomalies、get_expected_consecutiveメソッド追加 |
+| `app/jobs/data_integrity_check_job.rb` | データ整合性チェックジョブ新規作成 |
+| `spec/models/application_property_spec.rb` | ApplicationProperty テスト新規作成 |
+| `spec/models/financial_metric_spec.rb` | 連続増収増益検証テスト追加 |
+
 ## 2026-03-12 BUGFIX: ImportJquantsFinancialDataJob 429エラー時のデータ欠損防止
 
 ### 作業概要
