@@ -10,7 +10,7 @@ cleanup() {
   status="$1"
   local message=$(cat "$tmp_message" | jq -Rs . | sed 's/^"//;s/"$//')
   local content=$(cat "$tmp_log" | jq -Rs . | sed 's/^"//;s/"$//')
-  local meta="*${PROJECT_NAME}* $GIT_REPO_URL"
+  local meta="*${PROJECT_DISPLAY_NAME:-PROJECT_NAME}* $GIT_REPO_URL"
 
   if [ "$status" -eq 0 ]; then
     ${PROJECT_DIR}/.musashibox/slack_notif.sh "$meta \n${message}" "Done. Check WORKLOG.md" "#74F40B"
