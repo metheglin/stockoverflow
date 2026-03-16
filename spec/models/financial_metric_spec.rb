@@ -271,6 +271,138 @@ RSpec.describe FinancialMetric do
     end
   end
 
+  describe ".get_ev_ebitda" do
+    it "EV/EBITDAを正常に算出する" do
+      fv = FinancialValue.new(
+        shares_outstanding: 1_000_000,
+        operating_income: 500_000_000,
+        total_assets: 10_000_000_000,
+        net_assets: 4_000_000_000,
+        cash_and_equivalents: 1_000_000_000,
+      )
+      stock_price = 2000.0
+
+      result = FinancialMetric.get_ev_ebitda(fv, stock_price)
+
+      # EV = 2000 * 1_000_000 + (10B - 4B) - 1B = 2B + 6B - 1B = 7B
+      # EBITDA = 500_000_000
+      # EV/EBITDA = 7_000_000_000 / 500_000_000 = 14.0
+      expect(result["ev_ebitda"]).to eq(14.0)
+    end
+
+    it "株価がnilの場合は空Hashを返す" do
+      fv = FinancialValue.new(
+        shares_outstanding: 1_000_000,
+        operating_income: 500_000_000,
+        total_assets: 10_000_000_000,
+        net_assets: 4_000_000_000,
+      )
+
+      expect(FinancialMetric.get_ev_ebitda(fv, nil)).to eq({})
+    end
+
+    it "cash_and_equivalentsがnilの場合は0として扱う" do
+      fv = FinancialValue.new(
+        shares_outstanding: 1_000_000,
+        operating_income: 500_000_000,
+        total_assets: 10_000_000_000,
+        net_assets: 4_000_000_000,
+        cash_and_equivalents: nil,
+      )
+      stock_price = 2000.0
+
+      result = FinancialMetric.get_ev_ebitda(fv, stock_price)
+
+      # EV = 2B + 6B - 0 = 8B
+      # EBITDA = 500M
+      # EV/EBITDA = 16.0
+      expect(result["ev_ebitda"]).to eq(16.0)
+    end
+
+    it "shares_outstandingがnilの場合は空Hashを返す" do
+      fv = FinancialValue.new(
+        shares_outstanding: nil,
+        operating_income: 500_000_000,
+        total_assets: 10_000_000_000,
+        net_assets: 4_000_000_000,
+      )
+
+      expect(FinancialMetric.get_ev_ebitda(fv, 2000.0)).to eq({})
+    end
+  end
+
+  describe ".get_surprise_metrics" do
+    it "ポジティブサプライズの乖離率を算出する" do
+      current_fv = FinancialValue.new(
+        net_sales: 1_100_000_000,
+        operating_income: 220_000_000,
+        net_income: 150_000_000,
+        eps: BigDecimal("75.0"),
+      )
+      previous_fv = FinancialValue.new
+      allow(previous_fv).to receive(:data_json).and_return({
+        "forecast_net_sales" => 1_000_000_000,
+        "forecast_operating_income" => 200_000_000,
+        "forecast_net_income" => 130_000_000,
+        "forecast_eps" => 65.0,
+      })
+
+      result = FinancialMetric.get_surprise_metrics(current_fv, previous_fv)
+
+      expect(result["revenue_surprise"]).to eq(0.1)
+      expect(result["operating_income_surprise"]).to eq(0.1)
+      expect(result["net_income_surprise"]).to be_within(0.001).of(0.1538)
+      expect(result["eps_surprise"]).to be_within(0.001).of(0.1538)
+    end
+
+    it "ネガティブサプライズの乖離率を算出する" do
+      current_fv = FinancialValue.new(
+        net_sales: 900_000_000,
+        operating_income: 180_000_000,
+        net_income: 100_000_000,
+        eps: BigDecimal("50.0"),
+      )
+      previous_fv = FinancialValue.new
+      allow(previous_fv).to receive(:data_json).and_return({
+        "forecast_net_sales" => 1_000_000_000,
+        "forecast_operating_income" => 200_000_000,
+        "forecast_net_income" => 130_000_000,
+        "forecast_eps" => 65.0,
+      })
+
+      result = FinancialMetric.get_surprise_metrics(current_fv, previous_fv)
+
+      expect(result["revenue_surprise"]).to eq(-0.1)
+      expect(result["operating_income_surprise"]).to eq(-0.1)
+      expect(result["net_income_surprise"]).to be_within(0.001).of(-0.2308)
+      expect(result["eps_surprise"]).to be_within(0.001).of(-0.2308)
+    end
+
+    it "前期がnilの場合は空Hashを返す" do
+      current_fv = FinancialValue.new(net_sales: 1_000_000_000)
+
+      expect(FinancialMetric.get_surprise_metrics(current_fv, nil)).to eq({})
+    end
+
+    it "前期の予想がnilの場合は該当キーを含めない" do
+      current_fv = FinancialValue.new(
+        net_sales: 1_100_000_000,
+        operating_income: 220_000_000,
+      )
+      previous_fv = FinancialValue.new
+      allow(previous_fv).to receive(:data_json).and_return({
+        "forecast_net_sales" => 1_000_000_000,
+      })
+
+      result = FinancialMetric.get_surprise_metrics(current_fv, previous_fv)
+
+      expect(result.key?("revenue_surprise")).to eq(true)
+      expect(result.key?("operating_income_surprise")).to eq(false)
+      expect(result.key?("net_income_surprise")).to eq(false)
+      expect(result.key?("eps_surprise")).to eq(false)
+    end
+  end
+
   describe ".get_valuation_metrics" do
     it "バリュエーション指標を算出する" do
       fv = FinancialValue.new(

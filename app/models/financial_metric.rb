@@ -22,6 +22,10 @@ class FinancialMetric < ApplicationRecord
     psr: { type: :decimal },
     dividend_yield: { type: :decimal },
     ev_ebitda: { type: :decimal },
+    revenue_surprise: { type: :decimal },
+    operating_income_surprise: { type: :decimal },
+    net_income_surprise: { type: :decimal },
+    eps_surprise: { type: :decimal },
   }
 
   # 2つの FinancialValue から成長性指標（YoY）を算出する
@@ -118,6 +122,70 @@ class FinancialMetric < ApplicationRecord
     if fv.data_json&.dig("dividend_per_share_annual").present? && stock_price > 0
       dividend = fv.data_json["dividend_per_share_annual"].to_f
       result["dividend_yield"] = (dividend / stock_price).to_f
+    end
+
+    result
+  end
+
+  # EV/EBITDA を算出する
+  #
+  # EV (Enterprise Value) = 時価総額 + 有利子負債近似 - 現金同等物
+  #   時価総額 = stock_price * shares_outstanding
+  #   有利子負債近似 = total_assets - net_assets
+  # EBITDA = 営業利益（減価償却費データ未取得のため簡易版）
+  #
+  # @param fv [FinancialValue] 財務数値
+  # @param stock_price [Numeric, nil] 決算期末の株価
+  # @return [Hash] EV/EBITDA指標のHash（data_json格納用）
+  def self.get_ev_ebitda(fv, stock_price)
+    return {} unless stock_price
+    return {} unless fv.shares_outstanding.present?
+    return {} unless fv.operating_income.present? && fv.operating_income != 0
+    return {} unless fv.total_assets.present? && fv.net_assets.present?
+
+    market_cap = stock_price * fv.shares_outstanding
+    debt_approx = fv.total_assets - fv.net_assets
+    cash = fv.cash_and_equivalents || 0
+
+    ev = market_cap + debt_approx - cash
+    ebitda = fv.operating_income
+
+    { "ev_ebitda" => (ev.to_d / ebitda.to_d).round(2).to_f }
+  end
+
+  # 業績予想乖離率（Earning Surprise）を算出する
+  #
+  # 前期の業績予想と当期の実績を比較し、乖離率を算出する。
+  # 乖離率 = (実績 - 予想) / |予想|
+  #
+  # @param current_fv [FinancialValue] 当期の財務数値（実績）
+  # @param previous_fv [FinancialValue, nil] 前期の財務数値（予想を含む）
+  # @return [Hash] 乖離率指標のHash（data_json格納用）
+  #
+  # 例:
+  #   result = FinancialMetric.get_surprise_metrics(current_fv, previous_fv)
+  #   # => { "revenue_surprise" => 0.05, "operating_income_surprise" => -0.1, ... }
+  #
+  def self.get_surprise_metrics(current_fv, previous_fv)
+    return {} unless previous_fv
+    return {} unless previous_fv.data_json.is_a?(Hash)
+
+    result = {}
+
+    forecast_pairs = {
+      "revenue_surprise" => [:net_sales, "forecast_net_sales"],
+      "operating_income_surprise" => [:operating_income, "forecast_operating_income"],
+      "net_income_surprise" => [:net_income, "forecast_net_income"],
+      "eps_surprise" => [:eps, "forecast_eps"],
+    }
+
+    forecast_pairs.each do |key, (actual_attr, forecast_key)|
+      actual = current_fv.public_send(actual_attr)
+      forecast = previous_fv.data_json[forecast_key]
+      next if actual.nil? || forecast.nil? || forecast.to_d == 0
+
+      surprise = ((actual.to_d - forecast.to_d) / forecast.to_d.abs).round(4).to_f
+      result[key] = surprise
     end
 
     result

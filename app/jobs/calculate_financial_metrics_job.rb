@@ -38,11 +38,15 @@ class CalculateFinancialMetricsJob < ApplicationJob
     previous_fv = find_previous_financial_value(fv)
     previous_metric = previous_fv ? find_metric(previous_fv) : nil
 
+    stock_price = load_stock_price(fv)
+
     growth = FinancialMetric.get_growth_metrics(fv, previous_fv)
     profitability = FinancialMetric.get_profitability_metrics(fv)
     cf = FinancialMetric.get_cf_metrics(fv)
     consecutive = FinancialMetric.get_consecutive_metrics(growth, previous_metric)
-    valuation = FinancialMetric.get_valuation_metrics(fv, load_stock_price(fv))
+    valuation = FinancialMetric.get_valuation_metrics(fv, stock_price)
+    ev_ebitda = FinancialMetric.get_ev_ebitda(fv, stock_price)
+    surprise = FinancialMetric.get_surprise_metrics(fv, previous_fv)
 
     metric = FinancialMetric.find_or_initialize_by(
       company_id: fv.company_id,
@@ -59,8 +63,9 @@ class CalculateFinancialMetricsJob < ApplicationJob
       **consecutive,
     )
 
-    if valuation.any?
-      metric.data_json = (metric.data_json || {}).merge(valuation)
+    json_updates = {}.merge(valuation).merge(ev_ebitda).merge(surprise)
+    if json_updates.any?
+      metric.data_json = (metric.data_json || {}).merge(json_updates)
     end
 
     metric.save! if metric.new_record? || metric.changed?

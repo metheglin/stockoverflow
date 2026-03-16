@@ -2,6 +2,54 @@
 
 Claude's development work log for this project.
 
+## 2026-03-16 DEVELOP: 指標算出拡張（EV/EBITDA・業績予想乖離率）
+
+### 作業概要
+
+`CalculateFinancialMetricsJob` の指標算出パイプラインに、EV/EBITDA および業績予想乖離率（Earning Surprise）の算出ロジックを追加した。
+
+### 実施内容
+
+1. **FinancialMetric モデル拡張** (`app/models/financial_metric.rb`)
+   - `data_json` スキーマに4フィールドを追加: `revenue_surprise`, `operating_income_surprise`, `net_income_surprise`, `eps_surprise`
+   - `FinancialMetric.get_ev_ebitda(fv, stock_price)`: EV/EBITDA算出クラスメソッド
+     - EV = 時価総額 + 有利子負債近似(total_assets - net_assets) - 現金同等物
+     - EBITDA = 営業利益（減価償却費未取得のため簡易版）
+     - 結果は `data_json["ev_ebitda"]` に格納
+   - `FinancialMetric.get_surprise_metrics(current_fv, previous_fv)`: 業績予想乖離率算出クラスメソッド
+     - 前期の `data_json` に格納された `forecast_*` 値と当期の実績値を比較
+     - 乖離率 = (実績 - 予想) / |予想|
+     - 結果は `data_json` に `revenue_surprise`, `operating_income_surprise`, `net_income_surprise`, `eps_surprise` として格納
+
+2. **CalculateFinancialMetricsJob 拡張** (`app/jobs/calculate_financial_metrics_job.rb`)
+   - `calculate_metrics_for` メソッドで `get_ev_ebitda`, `get_surprise_metrics` を呼び出し
+   - 既存の `valuation` と合わせて `json_updates` として一括マージ
+
+3. **テスト** (`spec/models/financial_metric_spec.rb`)
+   - `.get_ev_ebitda`: 4 examples（正常算出、株価nil、cash_and_equivalents nil、shares_outstanding nil）
+   - `.get_surprise_metrics`: 4 examples（ポジティブサプライズ、ネガティブサプライズ、前期nil、前期予想nil）
+
+### 設計判断
+
+- **EV/EBITDA簡易版**: 減価償却費はXBRLから直接取得できていないため、EBITDA = 営業利益で近似。保守的に低い（割安に出にくい）EV/EBITDAを返す。将来的にEDINET XBRLから減価償却費を抽出して精度向上可能
+- **有利子負債近似**: 有利子負債の直接データがないため、total_assets - net_assets で近似（負債合計として扱う）
+- **Earning Surprise の前期参照**: 当期実績の前期FinancialValueの `data_json` に格納された予想値を使用。前期の予想 → 当期の実績という比較構造
+- **data_json格納**: EV/EBITDA・乖離率ともに `data_json` に格納。検索頻度が高まった場合は固定カラム化を検討
+
+### テスト結果
+
+- 全スイート: 127 examples, 0 failures, 5 pending
+- FinancialMetric: 42 examples, 0 failures（うち新規追加分8 examples）
+- pendingはcredentials/APIキー未設定によるもの（正当なskip）
+
+### 成果物
+
+| ファイル | 内容 |
+|---------|------|
+| `app/models/financial_metric.rb` | get_ev_ebitda, get_surprise_metricsクラスメソッド追加 + data_jsonスキーマ拡張 |
+| `app/jobs/calculate_financial_metrics_job.rb` | 新指標の算出組み込み |
+| `spec/models/financial_metric_spec.rb` | 新メソッドのテスト追加（8 examples） |
+
 ## 2026-03-16 DEVELOP: データ整合性チェック・モニタリング
 
 ### 作業概要
