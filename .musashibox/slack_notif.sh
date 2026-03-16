@@ -14,9 +14,7 @@ CONTENT=${2}
 COLOR=${3:-"#74F40B"}
 PAYLOAD=$(cat <<EOF
 {
-  "username": "[musashibox]${PROJECT_NAME}",
   "text": "$SUBJECT",
-  "icon_emoji": ":self-care:",
   "attachments": [
     {
       "color": "$COLOR",
