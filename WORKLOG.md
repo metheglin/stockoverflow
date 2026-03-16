@@ -2,6 +2,71 @@
 
 Claude's development work log for this project.
 
+## 2026-03-16 PLAN: セクター・業種別分析基盤設計
+
+### 作業概要
+
+33業種別 / 17業種別に統計量（平均・中央値・四分位）を算出・保存し、個別企業のセクター内ポジションを把握できる仕組みの詳細設計をおこなった。
+
+### 現状分析
+
+- `companies` テーブルに `sector_17_code`, `sector_17_name`, `sector_33_code`, `sector_33_name` が格納済み
+- `FinancialMetric` に ROE, ROA, 営業利益率, YoY, PER, PBR 等の指標は算出済み
+- しかし業種別の集計・比較をおこなう仕組みが一切存在しない
+
+### 設計内容
+
+#### 1. sector_metrics テーブル（新規）
+
+- `classification` (enum: sector_17/sector_33) + `sector_code` + `calculated_on` をユニークキーとするスナップショット管理テーブル
+- `company_count` で集計対象企業数を保持
+- `data_json` に11指標（roe, roa, operating_margin, net_margin, revenue_yoy, net_income_yoy, per, pbr, psr, ev_ebitda, dividend_yield）の統計量（mean/median/q1/q3/min/max/stddev/count）を格納
+- JSON格納の根拠: 統計量の値自体で検索する用途はなく、セクターコードをキーとしたlookup用途のためJSON型が適切
+
+#### 2. SectorMetric モデル
+
+- `get_statistics(values)`: 値の配列から統計量Hash（mean/median/q1/q3/min/max/stddev/count）を算出するクラスメソッド
+- `get_percentile_value(sorted, percentile)`: 線形補間法によるパーセンタイル算出
+- `get_stddev(sorted, mean)`: 標準偏差算出
+- `get_metric_value(metric, metric_key)`: FinancialMetricから指標値を読み取り（固定カラム・data_json共通インターフェース）
+- `get_relative_position(value, sector_stats)`: 個別企業の指標値のセクター内相対位置（quartile, vs_mean, vs_median）を算出
+- `load_latest_map(classification)`: 最新スナップショットをsector_codeキーのHashで返す便利メソッド
+
+#### 3. CalculateSectorMetricsJob
+
+- CalculateFinancialMetricsJob の後続として実行（週次推奨）
+- 最新の連結・通期FinancialMetricを上場企業について一括取得し、セクターごとにグループ化
+- 11指標について統計量を算出し sector_metrics に保存
+- エラーハンドリング: セクター単位でrescue、バッチ全体を止めない設計
+
+#### 4. Company::SectorComparisonQuery
+
+- セクター統計と個別企業を比較するQueryObject
+- 4つの比較条件: above_average, above_median, top_quartile, bottom_quartile
+- 金融セクター除外オプション（銀行業・保険業・証券業はROE/ROA等の水準が構造的に異なるため）
+- 二段階方式: セクター統計ロード → Rubyレベルで個別比較（SQLite JSON互換性・テスタビリティ重視）
+
+### 設計判断
+
+- **専用テーブル**: 50分類 × 11指標の統計量格納にはApplicationProperty拡張やEAVは不適切。専用テーブルで時系列スナップショット管理
+- **calculated_on**: プロジェクト目的「指標の推移やトレンドの転換がわかるように」に対応するスナップショット日付
+- **JSON型data_json**: 統計値はlookup用途であり検索対象でないためJSON格納（CLAUDE.md規約準拠）
+- **金融セクター対応**: 全セクターについて統計量を算出するが、クロスセクター比較時に金融セクター除外オプションを提供
+- **既存コードへの変更なし**: 新規テーブル・モデル・ジョブ・QueryObjectの追加のみで既存コードに影響を与えない
+
+### テスト計画
+
+- SectorMetric: 約16テスト項目（get_statistics 5項目, get_percentile_value 5項目, get_stddev 2項目, get_metric_value 3項目, get_relative_position 3項目）
+- Company::SectorComparisonQuery: 4テスト項目（build_threshold_map）
+- ジョブの稼働テストは記述しない（テスティング規約準拠）
+
+### 成果物
+
+| ファイル | 内容 |
+|---------|------|
+| `todo/20260316_1000_dev_sector_analysis_foundation_DEVELOP_pending.md` | セクター分析基盤 詳細実装仕様書（DEVELOP TODO） |
+| `todo/20260310_1501_plan_sector_analysis_PLAN_done.md` | 元PLANのステータスをdoneに変更 |
+
 ## 2026-03-16 DEVELOP: 指標算出拡張（EV/EBITDA・業績予想乖離率）
 
 ### 作業概要
