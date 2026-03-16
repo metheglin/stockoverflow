@@ -24,7 +24,7 @@ echo -e "\n${YELLOW}[1/4] SSH setup...${NC}"
 
 if [ ! -f "$HOME_DIR/.ssh-keys/id_ed25519" ]; then
   echo -e "${RED}  Error: SSH key not found at $HOME_DIR/.ssh-keys/${NC}" >&2
-  echo "SSH key not found: Run setup-keys.sh on the host first." | tee $tmp_message >&2
+  echo "SSH key not found: Run setup-keys.sh on the host first." | tee -a $tmp_message >&2
   exit 1
 fi
 
@@ -84,7 +84,7 @@ OUT="$("${PROJECT_DIR}/.musashibox/find_next_todo.sh")"
 echo $OUT
 
 [ -n "${OUT}" ] || {
-  echo "Nothing to do 🙄 Please review pending todos." | tee $tmp_message >&2
+  echo "Nothing to do 🙄 Please review pending todos." | tee -a $tmp_message >&2
   exit 0
 }
 
@@ -110,7 +110,7 @@ case "${TODO_TYPE}" in
     exec claude --dangerously-skip-permissions -p "$COMMAND"
     ;;
   *)
-    echo "Unknown TODO_TYPE=${TODO_TYPE}" | tee $tmp_message >&2
+    echo "Unknown TODO_TYPE=${TODO_TYPE}" | tee -a $tmp_message >&2
     # ${PROJECT_DIR}/.musashibox/slack_notif.sh "[musashibox]${PROJECT_NAME}" "Unknown TODO_TYPE=${TODO_TYPE}" "#E01F4C"
     exit 1
     :
