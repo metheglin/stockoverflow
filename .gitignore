@@ -36,3 +36,5 @@
 # EDINET XBRL test fixtures (large ZIP files)
 spec/fixtures/edinet/*.zip
 
+.claude/worktrees/
+
