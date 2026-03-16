@@ -172,8 +172,9 @@ class JquantsApi
       conn.headers["x-api-key"] = @api_key
       conn.request :retry,
         max: 4,
-        interval: 2,
+        interval: 3,
         backoff_factor: 2,
+        retry_statuses: [429, 500, 502, 503],
         exceptions: Faraday::Retry::Middleware::DEFAULT_EXCEPTIONS +
                     [Faraday::TooManyRequestsError]
       conn.response :raise_error
