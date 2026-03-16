@@ -123,6 +123,67 @@ class FinancialMetric < ApplicationRecord
     result
   end
 
+  # 連続増収増益期数の整合性を検証する
+  #
+  # @param metrics [Array<Hash>] fiscal_year_end昇順にソートされた指標のArray
+  #   各要素は :revenue_yoy, :net_income_yoy, :consecutive_revenue_growth,
+  #   :consecutive_profit_growth, :fiscal_year_end を含む
+  # @return [Array<Hash>] 不整合のあるエントリのArray
+  #   各要素: { fiscal_year_end:, field:, expected:, actual: }
+  #
+  # 例:
+  #   metrics = [
+  #     { fiscal_year_end: "2024-03-31", revenue_yoy: 0.1, consecutive_revenue_growth: 1, ... },
+  #     { fiscal_year_end: "2025-03-31", revenue_yoy: 0.05, consecutive_revenue_growth: 2, ... },
+  #   ]
+  #   FinancialMetric.detect_consecutive_anomalies(metrics)
+  #   # => [] (整合性OK)
+  #
+  def self.detect_consecutive_anomalies(metrics)
+    anomalies = []
+
+    metrics.each_cons(2) do |prev, current|
+      expected_revenue = get_expected_consecutive(
+        prev[:consecutive_revenue_growth], current[:revenue_yoy]
+      )
+      if current[:consecutive_revenue_growth] != expected_revenue
+        anomalies << {
+          fiscal_year_end: current[:fiscal_year_end],
+          field: :consecutive_revenue_growth,
+          expected: expected_revenue,
+          actual: current[:consecutive_revenue_growth],
+        }
+      end
+
+      expected_profit = get_expected_consecutive(
+        prev[:consecutive_profit_growth], current[:net_income_yoy]
+      )
+      if current[:consecutive_profit_growth] != expected_profit
+        anomalies << {
+          fiscal_year_end: current[:fiscal_year_end],
+          field: :consecutive_profit_growth,
+          expected: expected_profit,
+          actual: current[:consecutive_profit_growth],
+        }
+      end
+    end
+
+    anomalies
+  end
+
+  # 前期の連続期数とYoYから期待される連続期数を算出する
+  #
+  # @param previous_count [Integer] 前期の連続期数
+  # @param yoy [BigDecimal, nil] 当期のYoY
+  # @return [Integer] 期待される連続期数
+  def self.get_expected_consecutive(previous_count, yoy)
+    if yoy.present? && yoy > 0
+      previous_count + 1
+    else
+      0
+    end
+  end
+
   # YoY（前年同期比）を算出する
   #
   # @param current [Numeric, nil] 当期の値

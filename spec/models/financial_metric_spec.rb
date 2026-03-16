@@ -172,6 +172,105 @@ RSpec.describe FinancialMetric do
     end
   end
 
+  describe ".get_expected_consecutive" do
+    it "YoYが正の場合は前期+1を返す" do
+      expect(FinancialMetric.get_expected_consecutive(3, BigDecimal("0.1"))).to eq(4)
+    end
+
+    it "YoYが負の場合は0を返す" do
+      expect(FinancialMetric.get_expected_consecutive(5, BigDecimal("-0.05"))).to eq(0)
+    end
+
+    it "YoYが0の場合は0を返す" do
+      expect(FinancialMetric.get_expected_consecutive(3, BigDecimal("0"))).to eq(0)
+    end
+
+    it "YoYがnilの場合は0を返す" do
+      expect(FinancialMetric.get_expected_consecutive(3, nil)).to eq(0)
+    end
+
+    it "前期が0でYoYが正の場合は1を返す" do
+      expect(FinancialMetric.get_expected_consecutive(0, BigDecimal("0.2"))).to eq(1)
+    end
+  end
+
+  describe ".detect_consecutive_anomalies" do
+    it "正常な連続増収増益シーケンスの場合は空配列を返す" do
+      metrics = [
+        { fiscal_year_end: "2023-03-31", revenue_yoy: BigDecimal("0.1"), net_income_yoy: BigDecimal("0.15"),
+          consecutive_revenue_growth: 1, consecutive_profit_growth: 1 },
+        { fiscal_year_end: "2024-03-31", revenue_yoy: BigDecimal("0.08"), net_income_yoy: BigDecimal("0.12"),
+          consecutive_revenue_growth: 2, consecutive_profit_growth: 2 },
+        { fiscal_year_end: "2025-03-31", revenue_yoy: BigDecimal("0.05"), net_income_yoy: BigDecimal("0.10"),
+          consecutive_revenue_growth: 3, consecutive_profit_growth: 3 },
+      ]
+
+      expect(FinancialMetric.detect_consecutive_anomalies(metrics)).to eq([])
+    end
+
+    it "リセットを含む正常シーケンスの場合は空配列を返す" do
+      metrics = [
+        { fiscal_year_end: "2023-03-31", revenue_yoy: BigDecimal("0.1"), net_income_yoy: BigDecimal("0.15"),
+          consecutive_revenue_growth: 2, consecutive_profit_growth: 3 },
+        { fiscal_year_end: "2024-03-31", revenue_yoy: BigDecimal("-0.05"), net_income_yoy: BigDecimal("0.10"),
+          consecutive_revenue_growth: 0, consecutive_profit_growth: 4 },
+        { fiscal_year_end: "2025-03-31", revenue_yoy: BigDecimal("0.03"), net_income_yoy: BigDecimal("-0.02"),
+          consecutive_revenue_growth: 1, consecutive_profit_growth: 0 },
+      ]
+
+      expect(FinancialMetric.detect_consecutive_anomalies(metrics)).to eq([])
+    end
+
+    it "連続増収期数が飛んでいる場合に不整合を検出する" do
+      metrics = [
+        { fiscal_year_end: "2023-03-31", revenue_yoy: BigDecimal("0.1"), net_income_yoy: BigDecimal("0.15"),
+          consecutive_revenue_growth: 1, consecutive_profit_growth: 1 },
+        { fiscal_year_end: "2024-03-31", revenue_yoy: BigDecimal("0.08"), net_income_yoy: BigDecimal("0.12"),
+          consecutive_revenue_growth: 5, consecutive_profit_growth: 2 },
+      ]
+
+      anomalies = FinancialMetric.detect_consecutive_anomalies(metrics)
+
+      expect(anomalies.size).to eq(1)
+      expect(anomalies[0][:field]).to eq(:consecutive_revenue_growth)
+      expect(anomalies[0][:expected]).to eq(2)
+      expect(anomalies[0][:actual]).to eq(5)
+      expect(anomalies[0][:fiscal_year_end]).to eq("2024-03-31")
+    end
+
+    it "減収時にリセットされていない場合に不整合を検出する" do
+      metrics = [
+        { fiscal_year_end: "2023-03-31", revenue_yoy: BigDecimal("0.1"), net_income_yoy: BigDecimal("0.15"),
+          consecutive_revenue_growth: 3, consecutive_profit_growth: 2 },
+        { fiscal_year_end: "2024-03-31", revenue_yoy: BigDecimal("-0.10"), net_income_yoy: BigDecimal("-0.05"),
+          consecutive_revenue_growth: 4, consecutive_profit_growth: 3 },
+      ]
+
+      anomalies = FinancialMetric.detect_consecutive_anomalies(metrics)
+
+      expect(anomalies.size).to eq(2)
+      expect(anomalies[0][:field]).to eq(:consecutive_revenue_growth)
+      expect(anomalies[0][:expected]).to eq(0)
+      expect(anomalies[0][:actual]).to eq(4)
+      expect(anomalies[1][:field]).to eq(:consecutive_profit_growth)
+      expect(anomalies[1][:expected]).to eq(0)
+      expect(anomalies[1][:actual]).to eq(3)
+    end
+
+    it "要素が1つの場合は空配列を返す" do
+      metrics = [
+        { fiscal_year_end: "2024-03-31", revenue_yoy: BigDecimal("0.1"), net_income_yoy: BigDecimal("0.15"),
+          consecutive_revenue_growth: 1, consecutive_profit_growth: 1 },
+      ]
+
+      expect(FinancialMetric.detect_consecutive_anomalies(metrics)).to eq([])
+    end
+
+    it "空配列の場合は空配列を返す" do
+      expect(FinancialMetric.detect_consecutive_anomalies([])).to eq([])
+    end
+  end
+
   describe ".get_valuation_metrics" do
     it "バリュエーション指標を算出する" do
       fv = FinancialValue.new(
