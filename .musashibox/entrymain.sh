@@ -92,7 +92,7 @@ echo $OUT
 TODO_TYPE="$(echo $OUT | cut -d: -f1)"
 TODO_FILE="$(echo $OUT | cut -d: -f2)"
 
-echo "TODO_TYPE=$TODO_TYPE, TODO_FILE=$TODO_FILE" >> $tmp_message
+echo "$TODO_TYPE `$TODO_FILE` " >> $tmp_message
 
 # 3) TODO_TYPE に応じて出力
 case "${TODO_TYPE}" in
