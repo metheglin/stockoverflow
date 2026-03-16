@@ -85,7 +85,7 @@ echo $OUT
 
 [ -n "${OUT}" ] || {
   echo "Nothing to do 🙄 Please review pending todos." | tee -a $tmp_message >&2
-  exit 0
+  exit 2
 }
 
 # 2) 「:」で分割して TODO_TYPE / TODO_FILE に入れる
@@ -111,10 +111,7 @@ case "${TODO_TYPE}" in
     ;;
   *)
     echo "Unknown TODO_TYPE=${TODO_TYPE}" | tee -a $tmp_message >&2
-    # ${PROJECT_DIR}/.musashibox/slack_notif.sh "[musashibox]${PROJECT_NAME}" "Unknown TODO_TYPE=${TODO_TYPE}" "#E01F4C"
-    exit 1
+    exit 3
     :
     ;;
 esac
-
-# ${PROJECT_DIR}/.musashibox/slack_notif.sh "[musashibox]${PROJECT_NAME}" "DONE: TODO_TYPE=${TODO_TYPE}\nTODO_FILE=${TODO_FILE}" "#74F40B"

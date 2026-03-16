@@ -8,11 +8,8 @@ tmp_message="$(mktemp)"
 
 cleanup() {
   status="$1"
-  # local message=$(tail -n1 "$tmp_log")
-  # local content=$(jq -Rs . $tmp_log | jq -r .)
   local message=$(cat "$tmp_message" | jq -Rs . | sed 's/^"//;s/"$//')
   local content=$(cat "$tmp_log" | jq -Rs . | sed 's/^"//;s/"$//')
-  # local meta="TODO_TYPE=${TODO_TYPE}, TODO_FILE=${TODO_FILE}, GIT_REPO_URL=${GIT_REPO_URL}"
 
   if [ "$status" -ne 0 ]; then
     ${PROJECT_DIR}/.musashibox/slack_notif.sh "${message}" "$content" "#E01F4C"
