@@ -15,8 +15,6 @@ echo -e "${CYAN}========================================${NC}"
 echo -e "${CYAN}  musashibox Starting ${date}           ${NC}"
 echo -e "${CYAN}========================================${NC}"
 
-echo "GIT_REPO_URL=$GIT_REPO_URL" >> $tmp_message
-
 # -----------------------------------------
 # Step 1: SSH config (keys are mounted from host)
 # -----------------------------------------

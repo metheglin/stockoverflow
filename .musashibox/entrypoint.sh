@@ -10,14 +10,14 @@ cleanup() {
   status="$1"
   local message=$(cat "$tmp_message" | jq -Rs . | sed 's/^"//;s/"$//')
   local content=$(cat "$tmp_log" | jq -Rs . | sed 's/^"//;s/"$//')
-  # echo "status=$status"
+  local meta="*${PROJECT_NAME}* $GIT_REPO_URL"
 
   if [ "$status" -eq 0 ]; then
-    ${PROJECT_DIR}/.musashibox/slack_notif.sh "*${PROJECT_NAME}* \n${message}" "Done. Check WORKLOG.md" "#74F40B"
+    ${PROJECT_DIR}/.musashibox/slack_notif.sh "$meta \n${message}" "Done. Check WORKLOG.md" "#74F40B"
   elif [ "$status" -eq 1 ]; then
-    ${PROJECT_DIR}/.musashibox/slack_notif.sh "*${PROJECT_NAME}* \n${message}" "" "#F6C709"
+    ${PROJECT_DIR}/.musashibox/slack_notif.sh "$meta \n${message}" "" "#F6C709"
   else
-    ${PROJECT_DIR}/.musashibox/slack_notif.sh "*${PROJECT_NAME}* \n${message}" "$content" "#E01F4C"
+    ${PROJECT_DIR}/.musashibox/slack_notif.sh "$meta \n${message}" "$content" "#E01F4C"
   fi
 
   cat "$tmp_message"
