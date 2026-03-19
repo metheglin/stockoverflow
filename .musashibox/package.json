@@ -1,0 +1,12 @@
+{
+  "name": "musashibox-web",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "start": "node web/server.js",
+    "dev": "node web/server.js"
+  },
+  "dependencies": {
+    "express": "^4.21.0"
+  }
+}

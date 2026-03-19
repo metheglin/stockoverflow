@@ -1,5 +1,6 @@
 ssh-keys/
 .env*
+node_modules/
 
 /log/*
 !/log/.keep
