@@ -6,6 +6,7 @@ const app = express();
 const PORT = process.env.PORT || 6340;
 
 const TODO_DIR = path.join(__dirname, '..', 'todo');
+const ARCHIVE_DIR = path.join(TODO_DIR, 'archives');
 const WORKLOG_DIR = path.join(__dirname, '..', 'worklog');
 
 app.use(express.json());
@@ -51,11 +52,10 @@ function findWorklogs(todo) {
   }
 }
 
-// GET /api/todos - List all todos
-app.get('/api/todos', (req, res) => {
+function listTodosFromDir(dir) {
   try {
-    const files = fs.readdirSync(TODO_DIR).filter(f => f.endsWith('.md'));
-    const todos = files
+    const files = fs.readdirSync(dir).filter(f => f.endsWith('.md'));
+    return files
       .map(parseTodoFilename)
       .filter(Boolean)
       .map(todo => {
@@ -63,12 +63,70 @@ app.get('/api/todos', (req, res) => {
         return todo;
       })
       .sort((a, b) => {
-        // Sort by date+time descending
         const da = a.date + a.time;
         const db = b.date + b.time;
         return db.localeCompare(da);
       });
+  } catch (err) {
+    return [];
+  }
+}
+
+// GET /api/todos - List all todos
+app.get('/api/todos', (req, res) => {
+  try {
+    const todos = listTodosFromDir(TODO_DIR);
     res.json(todos);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /api/archives - List archived todos
+app.get('/api/archives', (req, res) => {
+  try {
+    const todos = listTodosFromDir(ARCHIVE_DIR);
+    res.json(todos);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /api/archives/:filename - Get archived todo content
+app.get('/api/archives/:filename', (req, res) => {
+  const filepath = path.join(ARCHIVE_DIR, req.params.filename);
+  if (!filepath.startsWith(ARCHIVE_DIR)) return res.status(400).json({ error: 'Invalid path' });
+  try {
+    const content = fs.readFileSync(filepath, 'utf-8');
+    const parsed = parseTodoFilename(req.params.filename);
+    res.json({ ...parsed, content });
+  } catch (err) {
+    res.status(404).json({ error: 'Not found' });
+  }
+});
+
+// POST /api/todos/:filename/archive - Move todo to archives
+app.post('/api/todos/:filename/archive', (req, res) => {
+  const oldPath = path.join(TODO_DIR, req.params.filename);
+  if (!oldPath.startsWith(TODO_DIR)) return res.status(400).json({ error: 'Invalid path' });
+  try {
+    if (!fs.existsSync(ARCHIVE_DIR)) fs.mkdirSync(ARCHIVE_DIR, { recursive: true });
+    const newPath = path.join(ARCHIVE_DIR, req.params.filename);
+    fs.renameSync(oldPath, newPath);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/archives/:filename/restore - Restore archived todo
+app.post('/api/archives/:filename/restore', (req, res) => {
+  const oldPath = path.join(ARCHIVE_DIR, req.params.filename);
+  if (!oldPath.startsWith(ARCHIVE_DIR)) return res.status(400).json({ error: 'Invalid path' });
+  try {
+    const newPath = path.join(TODO_DIR, req.params.filename);
+    fs.renameSync(oldPath, newPath);
+    res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
