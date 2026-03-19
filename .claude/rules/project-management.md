@@ -1,15 +1,15 @@
 # Project Management
 
 本プロジェクトでは、AIがおこなう作業をTODOとよぶ。  
-TODOは `todo/*.md` ファイルで表現され、これをTODOファイルとよぶ。
+TODOは `.musashibox/todo/*.md` ファイルで表現され、これをTODOファイルとよぶ。
 
 ## TODOファイル
 
 TODOファイルは次の命名ルールで作成される。
 
-`todo/{YYYYmmdd}_{HHMM}_{TODO_TITLE}_{TODO_TYPE}_{TODO_STATUS}.md`
+`{YYYYmmdd}_{HHMM}_{TODO_TITLE}_{TODO_TYPE}_{TODO_STATUS}.md`
 
-Ex: `todo/20260303_1202_bugfix_apiclient_pending.md`
+Ex: `20260303_1202_bugfix_apiclient_pending.md`
 
 - TODO_TITLE
   - TODOのかんたんなタイトル。英数字アンダースコア
@@ -37,10 +37,10 @@ Ex: `todo/20260303_1202_bugfix_apiclient_pending.md`
 実装は一切おこなわない。詳細仕様も作成しない。本プロジェクトに必要となる開発計画・または実装・修正・テストを自ら考え、その指示を記載したTODOを作成する。
 
 作業内容
-- 成果物は新たなTODOで、 `todo/` 以下にタスクを作成する
+- 成果物は新たなTODOで、 `.musashibox/todo/` 以下にタスクを作成する
   - 開発計画が必要な場合は、ファイル名の変数部分を次のように設定: TODO_TYPE=PLAN, TODO_STATUS=pending 
   - 実装・テスト・修正が必要な場合は、ファイル名の変数部分を次のように設定: TODO_TYPE=DEVELOP, TODO_STATUS=pending 
-- `WORKLOG.md`に作業ログを記述する
+- `worklog/` 以下に作業ログを記述する
 - 成果物とともにpushする
 
 ### TODO_TYPE=PLAN 作業内容
@@ -52,9 +52,9 @@ Ex: `todo/20260303_1202_bugfix_apiclient_pending.md`
 作業内容
 - 指示されたTODOファイルを確認する
 - 指示にしたがって詳細仕様を作成する
-- 成果物は新たな開発計画・詳細仕様書で、 `todo/` 以下に計画書を作成する
+- 成果物は新たな開発計画・詳細仕様書で、 `.musashibox/todo/` 以下に計画書を作成する
 - プロンプトで示されたTODOファイルのTODO_STATUSを`done`に変更する
-- `WORKLOG.md`に作業ログを記述する
+- `worklog/` 以下に作業ログを記述する
 - 成果物とともにpushする
 
 ### TODO_TYPE=DEVELOP 作業内容
@@ -67,6 +67,13 @@ Ex: `todo/20260303_1202_bugfix_apiclient_pending.md`
 - 指示された TODOファイルを確認する
 - 計画にしたがって実装をおこなう
 - 実装完了したら、そのTODO_STATUSを`done`に変更する
-- `WORKLOG.md`に作業ログを記述する
+- `worklog/` 以下に作業ログを記述する
 - やり残したことがあれば、次回作業内容をTODOファイルとして作成しておく。このとき TODO_STATUS=`inprogress` で作成し、レビューをスキップしてよい
 - 開発成果物とともにpushする
+
+## WORKLOG
+
+AIが作業をおこなう際は必ずWORKLOGとして考えたこと、開発したことなど作業ログとして記載してタスクを終えること。  
+WORKLOGは次のよう名前で、作業ごとに1つのログファイルを作成すること。
+
+`.musashibox/worklog/{YYYYmmdd}_{HHMM}_{TODO_TITLE}.md`
