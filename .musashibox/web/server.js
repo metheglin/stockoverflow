@@ -72,6 +72,36 @@ function listTodosFromDir(dir) {
   }
 }
 
+// POST /api/todos - Create a new todo
+app.post('/api/todos', (req, res) => {
+  const { title, todoType, status, content } = req.body;
+  const validTypes = ['THINK', 'PLAN', 'DEVELOP'];
+  const validStatuses = ['pending', 'inprogress', 'done', 'completed'];
+
+  if (!title || !validTypes.includes(todoType)) {
+    return res.status(400).json({ error: 'title and valid todoType (THINK/PLAN/DEVELOP) are required' });
+  }
+
+  const st = validStatuses.includes(status) ? status : 'pending';
+  const now = new Date();
+  const date = now.getFullYear().toString()
+    + (now.getMonth() + 1).toString().padStart(2, '0')
+    + now.getDate().toString().padStart(2, '0');
+  const time = now.getHours().toString().padStart(2, '0')
+    + now.getMinutes().toString().padStart(2, '0');
+
+  const safeTitle = title.replace(/[^a-zA-Z0-9_]/g, '_').replace(/_+/g, '_').replace(/^_|_$/g, '');
+  const filename = `${date}_${time}_${safeTitle}_${todoType}_${st}.md`;
+  const filepath = path.join(TODO_DIR, filename);
+
+  try {
+    fs.writeFileSync(filepath, content || '', 'utf-8');
+    res.json({ success: true, filename });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // GET /api/todos - List all todos
 app.get('/api/todos', (req, res) => {
   try {

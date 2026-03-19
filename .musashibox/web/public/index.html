@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>MusashiBox - TODO Manager</title>
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f5f5f5; color: #333; }
@@ -90,11 +91,43 @@
     .archive-badge { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 600; background: #f0f0f0; color: #999; border: 1px dashed #ccc; }
 
     .todo-item.archived { opacity: 0.7; border-style: dashed; }
+
+    .md-preview { width: 100%; min-height: 400px; border: 1px solid #ddd; border-radius: 6px; padding: 12px 16px; font-size: 14px; line-height: 1.7; overflow-y: auto; }
+    .md-preview h1 { font-size: 1.4em; margin: 0.6em 0 0.4em; border-bottom: 1px solid #eee; padding-bottom: 0.3em; }
+    .md-preview h2 { font-size: 1.2em; margin: 0.5em 0 0.3em; border-bottom: 1px solid #f0f0f0; padding-bottom: 0.2em; }
+    .md-preview h3 { font-size: 1.05em; margin: 0.4em 0 0.2em; }
+    .md-preview ul, .md-preview ol { padding-left: 1.5em; margin: 0.4em 0; }
+    .md-preview li { margin: 0.2em 0; }
+    .md-preview code { background: #f4f4f4; padding: 1px 4px; border-radius: 3px; font-size: 0.9em; }
+    .md-preview pre { background: #f4f4f4; padding: 10px; border-radius: 4px; overflow-x: auto; margin: 0.5em 0; }
+    .md-preview pre code { background: none; padding: 0; }
+    .md-preview blockquote { border-left: 3px solid #ddd; padding-left: 12px; color: #666; margin: 0.5em 0; }
+    .md-preview p { margin: 0.4em 0; }
+
+    .mode-toggle { display: flex; gap: 0; border: 1px solid #ddd; border-radius: 6px; overflow: hidden; margin-bottom: 12px; }
+    .mode-toggle button { padding: 6px 16px; border: none; background: #fff; cursor: pointer; font-size: 13px; transition: all 0.15s; }
+    .mode-toggle button:not(:last-child) { border-right: 1px solid #ddd; }
+    .mode-toggle button.active { background: #2c3e50; color: #fff; }
+
+    .create-modal-overlay { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.4); z-index: 200; justify-content: center; align-items: center; }
+    .create-modal-overlay.open { display: flex; }
+    .create-modal { background: #fff; border-radius: 10px; padding: 24px; width: 480px; max-width: 90vw; box-shadow: 0 8px 30px rgba(0,0,0,0.2); }
+    .create-modal h2 { font-size: 18px; margin-bottom: 16px; }
+    .form-group { margin-bottom: 14px; }
+    .form-group label { display: block; font-size: 13px; font-weight: 500; margin-bottom: 4px; color: #555; }
+    .form-group input, .form-group select { width: 100%; padding: 8px 10px; border: 1px solid #ddd; border-radius: 4px; font-size: 14px; }
+
+    .header-actions { margin-left: auto; }
+    .btn-create { background: #27ae60; color: #fff; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: 500; }
+    .btn-create:hover { background: #219a52; }
   </style>
 </head>
 <body>
   <div class="header">
     <h1>MusashiBox TODO Manager</h1>
+    <div class="header-actions">
+      <button class="btn-create" id="openCreateModal">+ New TODO</button>
+    </div>
   </div>
 
   <div class="container">
@@ -123,8 +156,13 @@
     </div>
     <div class="panel-body">
       <div class="panel-meta" id="panelMeta"></div>
-      <textarea class="editor-area" id="editor"></textarea>
-      <div class="btn-row">
+      <div class="mode-toggle">
+        <button class="active" data-mode="preview">Preview</button>
+        <button data-mode="edit">Edit</button>
+      </div>
+      <div class="md-preview" id="preview"></div>
+      <textarea class="editor-area" id="editor" style="display:none;"></textarea>
+      <div class="btn-row" id="editBtnRow" style="display:none;">
         <button class="btn btn-primary" id="saveBtn">Save</button>
         <span class="save-feedback" id="saveFeedback">Saved!</span>
       </div>
@@ -135,12 +173,42 @@
     </div>
   </div>
 
+  <div class="create-modal-overlay" id="createModalOverlay">
+    <div class="create-modal">
+      <h2>New TODO</h2>
+      <div class="form-group">
+        <label>Title</label>
+        <input type="text" id="createTitle" placeholder="dev_feature_name">
+      </div>
+      <div class="form-group">
+        <label>Type</label>
+        <select id="createType">
+          <option value="DEVELOP">DEVELOP</option>
+          <option value="PLAN">PLAN</option>
+          <option value="THINK">THINK</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Status</label>
+        <select id="createStatus">
+          <option value="pending">pending</option>
+          <option value="inprogress">inprogress</option>
+        </select>
+      </div>
+      <div class="btn-row">
+        <button class="btn btn-primary" id="createSubmitBtn">Create</button>
+        <button class="btn btn-secondary" id="createCancelBtn">Cancel</button>
+      </div>
+    </div>
+  </div>
+
   <script>
     let todos = [];
     let archives = [];
     let currentFilter = 'all';
     let currentTodo = null;
     let currentView = 'todos'; // 'todos' or 'archives'
+    let panelMode = 'preview'; // 'preview' or 'edit'
 
     async function loadTodos() {
       const res = await fetch('/api/todos');
@@ -247,6 +315,33 @@
       openPanel(todo);
     });
 
+    function switchPanelMode(mode) {
+      panelMode = mode;
+      document.querySelectorAll('.mode-toggle button').forEach(b => {
+        b.classList.toggle('active', b.dataset.mode === mode);
+      });
+      const editor = document.getElementById('editor');
+      const preview = document.getElementById('preview');
+      const editBtnRow = document.getElementById('editBtnRow');
+      if (mode === 'edit') {
+        preview.style.display = 'none';
+        editor.style.display = '';
+        editBtnRow.style.display = '';
+      } else {
+        editor.style.display = 'none';
+        editBtnRow.style.display = 'none';
+        preview.style.display = '';
+        preview.innerHTML = marked.parse(editor.value || '');
+      }
+    }
+
+    // Mode toggle
+    document.querySelector('.mode-toggle').addEventListener('click', e => {
+      const btn = e.target.closest('button[data-mode]');
+      if (!btn) return;
+      switchPanelMode(btn.dataset.mode);
+    });
+
     function openPanel(todo) {
       document.getElementById('panelTitle').textContent = todo.title.replace(/_/g, ' ');
       document.getElementById('editor').value = todo.content;
@@ -309,6 +404,8 @@
         };
         btnRow.appendChild(archiveBtn);
       }
+
+      switchPanelMode('preview');
 
       document.getElementById('overlay').classList.add('open');
       document.getElementById('detailPanel').classList.add('open');
@@ -380,9 +477,58 @@
       return div.innerHTML;
     }
 
+    // Create modal
+    document.getElementById('openCreateModal').addEventListener('click', () => {
+      document.getElementById('createTitle').value = '';
+      document.getElementById('createType').value = 'DEVELOP';
+      document.getElementById('createStatus').value = 'pending';
+      document.getElementById('createModalOverlay').classList.add('open');
+    });
+    document.getElementById('createCancelBtn').addEventListener('click', () => {
+      document.getElementById('createModalOverlay').classList.remove('open');
+    });
+    document.getElementById('createModalOverlay').addEventListener('click', e => {
+      if (e.target === e.currentTarget) {
+        document.getElementById('createModalOverlay').classList.remove('open');
+      }
+    });
+    document.getElementById('createSubmitBtn').addEventListener('click', async () => {
+      const title = document.getElementById('createTitle').value.trim();
+      if (!title) { alert('Title is required'); return; }
+      const todoType = document.getElementById('createType').value;
+      const status = document.getElementById('createStatus').value;
+
+      const res = await fetch('/api/todos', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title, todoType, status, content: '' }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        document.getElementById('createModalOverlay').classList.remove('open');
+        await loadTodos();
+        // Open the newly created todo
+        const fetchRes = await fetch(`/api/todos/${encodeURIComponent(data.filename)}`);
+        const todo = await fetchRes.json();
+        todo._isArchived = false;
+        currentTodo = todo;
+        openPanel(todo);
+        switchPanelMode('edit');
+      } else {
+        alert(data.error || 'Failed to create TODO');
+      }
+    });
+
     // Keyboard shortcut
     document.addEventListener('keydown', e => {
-      if (e.key === 'Escape') closePanel();
+      if (e.key === 'Escape') {
+        const createModal = document.getElementById('createModalOverlay');
+        if (createModal.classList.contains('open')) {
+          createModal.classList.remove('open');
+        } else {
+          closePanel();
+        }
+      }
     });
 
     loadTodos();
