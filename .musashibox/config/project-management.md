@@ -73,7 +73,18 @@ Ex: `20260303_1202_bugfix_apiclient_pending.md`
 
 ## WORKLOG
 
-AIが作業をおこなう際は必ずWORKLOGとして考えたこと、開発したことなど作業ログとして記載してタスクを終えること。  
+AIが作業をおこなう際は必ずWORKLOGとして考えたこと、開発したことなど作業ログとして記載してタスクを終えること。
+
+### 命名ルール
+
 WORKLOGは次のよう名前で、作業ごとに1つのログファイルを作成すること。
 
-`.musashibox/worklog/{YYYYmmdd}_{HHMM}_{TODO_TITLE}.md`
+`.musashibox/worklog/{YYYYmmdd}_{HHMM}_{TODO_TITLE}_{TODO_TYPE}.md`
+
+ファイル名から元のTODOファイルをひもづけできるよう、元のTODOファイルと同じ変数をつかうこと。
+
+### ログの内容
+
+- 本WORKLOGが記載された日時を必ずファイル内に記載する（ファイル名の日時はTODOファイルと同じにするため）
+- 作業の概要
+- 考えたこと・作業の内容（自由記述）
