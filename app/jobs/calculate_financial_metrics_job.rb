@@ -50,6 +50,17 @@ class CalculateFinancialMetricsJob < ApplicationJob
     financial_health = FinancialMetric.get_financial_health_metrics(fv)
     efficiency = FinancialMetric.get_efficiency_metrics(fv)
 
+    quarterly_yoy = {}
+    unless fv.annual?
+      current_prev_quarter_fv = find_previous_quarter_financial_value(fv)
+      prior_prev_quarter_fv = previous_fv ? find_previous_quarter_financial_value(previous_fv) : nil
+      quarterly_yoy = FinancialMetric.get_quarterly_yoy_metrics(
+        fv, previous_fv,
+        current_prev_quarter_fv: current_prev_quarter_fv,
+        prior_prev_quarter_fv: prior_prev_quarter_fv,
+      )
+    end
+
     metric = FinancialMetric.find_or_initialize_by(
       company_id: fv.company_id,
       fiscal_year_end: fv.fiscal_year_end,
@@ -65,7 +76,7 @@ class CalculateFinancialMetricsJob < ApplicationJob
       **consecutive,
     )
 
-    json_updates = {}.merge(valuation).merge(ev_ebitda).merge(surprise).merge(financial_health).merge(efficiency)
+    json_updates = {}.merge(valuation).merge(ev_ebitda).merge(surprise).merge(financial_health).merge(efficiency).merge(quarterly_yoy)
     if json_updates.any?
       metric.data_json = (metric.data_json || {}).merge(json_updates)
     end
@@ -95,6 +106,20 @@ class CalculateFinancialMetricsJob < ApplicationJob
       )
       .order(fiscal_year_end: :desc)
       .first
+  end
+
+  # 同一会計年度内の前四半期 FinancialValue を検索
+  # Q2 → Q1、Q3 → Q2 を返す。Q1・annual の場合は nil
+  def find_previous_quarter_financial_value(fv)
+    prior_period = { "q2" => "q1", "q3" => "q2" }[fv.period_type]
+    return nil unless prior_period
+
+    FinancialValue.find_by(
+      company_id: fv.company_id,
+      scope: fv.scope,
+      fiscal_year_end: fv.fiscal_year_end,
+      period_type: prior_period,
+    )
   end
 
   # FinancialValue に対応する FinancialMetric を検索

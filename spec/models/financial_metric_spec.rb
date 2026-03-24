@@ -597,4 +597,220 @@ RSpec.describe FinancialMetric do
       expect(result).to eq({})
     end
   end
+
+  describe ".get_standalone_quarter_value" do
+    it "前四半期がnilの場合（Q1）は累計値をそのまま返す" do
+      fv = FinancialValue.new(net_sales: 5_000_000_000)
+
+      result = FinancialMetric.get_standalone_quarter_value(fv, nil, :net_sales)
+
+      expect(result).to eq(5_000_000_000)
+    end
+
+    it "前四半期が存在する場合は差分を返す" do
+      q2_fv = FinancialValue.new(net_sales: 12_000_000_000)
+      q1_fv = FinancialValue.new(net_sales: 5_000_000_000)
+
+      result = FinancialMetric.get_standalone_quarter_value(q2_fv, q1_fv, :net_sales)
+
+      expect(result).to eq(7_000_000_000)
+    end
+
+    it "当期値がnilの場合はnilを返す" do
+      fv = FinancialValue.new(net_sales: nil)
+      prev_fv = FinancialValue.new(net_sales: 5_000_000_000)
+
+      result = FinancialMetric.get_standalone_quarter_value(fv, prev_fv, :net_sales)
+
+      expect(result).to be_nil
+    end
+
+    it "前四半期の値がnilの場合はnilを返す" do
+      fv = FinancialValue.new(net_sales: 12_000_000_000)
+      prev_fv = FinancialValue.new(net_sales: nil)
+
+      result = FinancialMetric.get_standalone_quarter_value(fv, prev_fv, :net_sales)
+
+      expect(result).to be_nil
+    end
+
+    it "Q3の場合はQ3累計 - Q2累計を返す" do
+      q3_fv = FinancialValue.new(operating_income: 900_000_000)
+      q2_fv = FinancialValue.new(operating_income: 550_000_000)
+
+      result = FinancialMetric.get_standalone_quarter_value(q3_fv, q2_fv, :operating_income)
+
+      expect(result).to eq(350_000_000)
+    end
+  end
+
+  describe ".get_quarterly_yoy_metrics" do
+    it "Q2の単独四半期YoYを算出する" do
+      # 当期: Q2累計 12B, Q1累計 5B → Q2単独 7B
+      # 前年: Q2累計 10B, Q1累計 4B → Q2単独 6B
+      # 売上YoY = (7B - 6B) / 6B = 0.1667
+      current_q2 = FinancialValue.new(
+        period_type: :q2,
+        net_sales: 12_000_000_000,
+        operating_income: 1_400_000_000,
+        net_income: 900_000_000,
+      )
+      current_q1 = FinancialValue.new(
+        period_type: :q1,
+        net_sales: 5_000_000_000,
+        operating_income: 600_000_000,
+        net_income: 400_000_000,
+      )
+      prior_q2 = FinancialValue.new(
+        period_type: :q2,
+        net_sales: 10_000_000_000,
+        operating_income: 1_200_000_000,
+        net_income: 800_000_000,
+      )
+      prior_q1 = FinancialValue.new(
+        period_type: :q1,
+        net_sales: 4_000_000_000,
+        operating_income: 500_000_000,
+        net_income: 350_000_000,
+      )
+
+      result = FinancialMetric.get_quarterly_yoy_metrics(
+        current_q2, prior_q2,
+        current_prev_quarter_fv: current_q1,
+        prior_prev_quarter_fv: prior_q1,
+      )
+
+      # Q2単独売上: 7B vs 6B → YoY = 1/6 = 0.1667
+      expect(result["standalone_quarter_revenue_yoy"]).to be_within(0.001).of(0.1667)
+      # Q2単独営業利益: 800M vs 700M → YoY = 100M/700M = 0.1429
+      expect(result["standalone_quarter_operating_income_yoy"]).to be_within(0.001).of(0.1429)
+      # Q2単独純利益: 500M vs 450M → YoY = 50M/450M = 0.1111
+      expect(result["standalone_quarter_net_income_yoy"]).to be_within(0.001).of(0.1111)
+    end
+
+    it "Q1の場合は累計値ベースでYoYを算出する" do
+      current_q1 = FinancialValue.new(
+        period_type: :q1,
+        net_sales: 5_500_000_000,
+        operating_income: 700_000_000,
+        net_income: 450_000_000,
+      )
+      prior_q1 = FinancialValue.new(
+        period_type: :q1,
+        net_sales: 5_000_000_000,
+        operating_income: 600_000_000,
+        net_income: 400_000_000,
+      )
+
+      result = FinancialMetric.get_quarterly_yoy_metrics(current_q1, prior_q1)
+
+      # Q1は累計=単独。売上YoY = 500M / 5B = 0.1
+      expect(result["standalone_quarter_revenue_yoy"]).to be_within(0.001).of(0.1)
+      expect(result["standalone_quarter_operating_income_yoy"]).to be_within(0.001).of(0.1667)
+      expect(result["standalone_quarter_net_income_yoy"]).to be_within(0.001).of(0.125)
+    end
+
+    it "前年同四半期がnilの場合は空Hashを返す" do
+      current_q2 = FinancialValue.new(
+        period_type: :q2,
+        net_sales: 12_000_000_000,
+      )
+
+      result = FinancialMetric.get_quarterly_yoy_metrics(current_q2, nil)
+
+      expect(result).to eq({})
+    end
+
+    it "annual期の場合は空Hashを返す" do
+      current_annual = FinancialValue.new(
+        period_type: :annual,
+        net_sales: 20_000_000_000,
+      )
+      prior_annual = FinancialValue.new(
+        period_type: :annual,
+        net_sales: 18_000_000_000,
+      )
+
+      result = FinancialMetric.get_quarterly_yoy_metrics(current_annual, prior_annual)
+
+      expect(result).to eq({})
+    end
+
+    it "前四半期レコードが欠損している場合は累計ベースのYoYを算出する" do
+      # Q2だが前四半期(Q1)がない → 累計値をそのまま使う
+      current_q2 = FinancialValue.new(
+        period_type: :q2,
+        net_sales: 12_000_000_000,
+        operating_income: 1_400_000_000,
+        net_income: 900_000_000,
+      )
+      prior_q2 = FinancialValue.new(
+        period_type: :q2,
+        net_sales: 10_000_000_000,
+        operating_income: 1_200_000_000,
+        net_income: 800_000_000,
+      )
+
+      result = FinancialMetric.get_quarterly_yoy_metrics(
+        current_q2, prior_q2,
+        current_prev_quarter_fv: nil,
+        prior_prev_quarter_fv: nil,
+      )
+
+      # 累計ベース: 12B vs 10B → 0.2
+      expect(result["standalone_quarter_revenue_yoy"]).to be_within(0.001).of(0.2)
+    end
+
+    it "当期の前四半期のみ欠損している場合は値がnilとなりスキップする" do
+      current_q2 = FinancialValue.new(
+        period_type: :q2,
+        net_sales: 12_000_000_000,
+        operating_income: nil,
+        net_income: nil,
+      )
+      prior_q2 = FinancialValue.new(
+        period_type: :q2,
+        net_sales: 10_000_000_000,
+        operating_income: 1_200_000_000,
+        net_income: 800_000_000,
+      )
+      prior_q1 = FinancialValue.new(
+        period_type: :q1,
+        net_sales: 4_000_000_000,
+        operating_income: 500_000_000,
+        net_income: 350_000_000,
+      )
+
+      result = FinancialMetric.get_quarterly_yoy_metrics(
+        current_q2, prior_q2,
+        current_prev_quarter_fv: nil,
+        prior_prev_quarter_fv: prior_q1,
+      )
+
+      # net_sales: current has no prev_quarter → standalone=cumulative(12B), prior: 10B-4B=6B → 12B vs 6B = 1.0
+      expect(result["standalone_quarter_revenue_yoy"]).to be_within(0.001).of(1.0)
+      # operating_income: current is nil → skip
+      expect(result).not_to have_key("standalone_quarter_operating_income_yoy")
+      expect(result).not_to have_key("standalone_quarter_net_income_yoy")
+    end
+
+    it "前年同四半期の値が0の場合はその指標をスキップする" do
+      current_q1 = FinancialValue.new(
+        period_type: :q1,
+        net_sales: 5_000_000_000,
+        operating_income: 100_000_000,
+        net_income: 50_000_000,
+      )
+      prior_q1 = FinancialValue.new(
+        period_type: :q1,
+        net_sales: 0,
+        operating_income: 0,
+        net_income: 0,
+      )
+
+      result = FinancialMetric.get_quarterly_yoy_metrics(current_q1, prior_q1)
+
+      expect(result).to eq({})
+    end
+  end
 end

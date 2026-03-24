@@ -34,6 +34,10 @@ class FinancialMetric < ApplicationRecord
     asset_turnover: { type: :decimal },
     gross_margin: { type: :decimal },
     sga_ratio: { type: :decimal },
+    # 四半期単独YoY
+    standalone_quarter_revenue_yoy: { type: :decimal },
+    standalone_quarter_operating_income_yoy: { type: :decimal },
+    standalone_quarter_net_income_yoy: { type: :decimal },
   }
 
   # 2つの FinancialValue から成長性指標（YoY）を算出する
@@ -328,6 +332,66 @@ class FinancialMetric < ApplicationRecord
     else
       0
     end
+  end
+
+  # 四半期単独値を算出する
+  #
+  # 累計値から前四半期累計値を差し引き、当該四半期の単独値を算出する。
+  # Q1の場合（prev_quarter_fv が nil）は累計値がそのまま単独値となる。
+  #
+  # @param fv [FinancialValue] 当該四半期の財務数値（累計）
+  # @param prev_quarter_fv [FinancialValue, nil] 前四半期の財務数値（累計）
+  # @param attr [Symbol] 属性名
+  # @return [Numeric, nil] 単独四半期値
+  def self.get_standalone_quarter_value(fv, prev_quarter_fv, attr)
+    current_value = fv.public_send(attr)
+    return nil if current_value.nil?
+
+    return current_value if prev_quarter_fv.nil?
+
+    prev_value = prev_quarter_fv.public_send(attr)
+    return nil if prev_value.nil?
+
+    current_value - prev_value
+  end
+
+  # 四半期前年同期比（単独四半期ベース）を算出する
+  #
+  # 累計値から単独四半期値を逆算し、前年同四半期との比較を行う。
+  # annual期のデータには対応しない（空Hashを返す）。
+  #
+  # @param current_fv [FinancialValue] 当期四半期の財務数値（累計）
+  # @param prior_same_quarter_fv [FinancialValue, nil] 前年同四半期の財務数値（累計）
+  # @param current_prev_quarter_fv [FinancialValue, nil] 当期の前四半期財務数値（累計、Q1の場合nil）
+  # @param prior_prev_quarter_fv [FinancialValue, nil] 前年の前四半期財務数値（累計、Q1の場合nil）
+  # @return [Hash] 単独四半期YoY指標のHash（data_json格納用）
+  #
+  # 例:
+  #   result = FinancialMetric.get_quarterly_yoy_metrics(q2_fv, prev_q2_fv,
+  #     current_prev_quarter_fv: q1_fv, prior_prev_quarter_fv: prev_q1_fv)
+  #   # => { "standalone_quarter_revenue_yoy" => 0.12, ... }
+  #
+  def self.get_quarterly_yoy_metrics(current_fv, prior_same_quarter_fv, current_prev_quarter_fv: nil, prior_prev_quarter_fv: nil)
+    return {} unless prior_same_quarter_fv
+    return {} if current_fv.annual?
+
+    fields = {
+      "standalone_quarter_revenue_yoy" => :net_sales,
+      "standalone_quarter_operating_income_yoy" => :operating_income,
+      "standalone_quarter_net_income_yoy" => :net_income,
+    }
+
+    result = {}
+
+    fields.each do |metric_key, fv_attr|
+      current_standalone = get_standalone_quarter_value(current_fv, current_prev_quarter_fv, fv_attr)
+      prior_standalone = get_standalone_quarter_value(prior_same_quarter_fv, prior_prev_quarter_fv, fv_attr)
+
+      yoy = compute_yoy(current_standalone, prior_standalone)
+      result[metric_key] = yoy.to_f if yoy
+    end
+
+    result
   end
 
   # YoY（前年同期比）を算出する
