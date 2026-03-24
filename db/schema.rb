@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_03_05_110047) do
+ActiveRecord::Schema[8.1].define(version: 2026_03_24_060238) do
   create_table "application_properties", force: :cascade do |t|
     t.datetime "created_at", null: false
     t.json "data_json", default: "{}", null: false
@@ -143,6 +143,19 @@ ActiveRecord::Schema[8.1].define(version: 2026_03_05_110047) do
     t.index ["company_id"], name: "index_financial_values_on_company_id"
     t.index ["financial_report_id"], name: "index_financial_values_on_financial_report_id"
     t.index ["fiscal_year_end"], name: "index_financial_values_on_fiscal_year_end"
+  end
+
+  create_table "sector_metrics", force: :cascade do |t|
+    t.date "calculated_on", null: false
+    t.integer "classification", null: false
+    t.integer "company_count", default: 0, null: false
+    t.datetime "created_at", null: false
+    t.json "data_json"
+    t.string "sector_code", null: false
+    t.string "sector_name", null: false
+    t.datetime "updated_at", null: false
+    t.index ["classification", "calculated_on"], name: "idx_sector_metrics_classification_date"
+    t.index ["classification", "sector_code", "calculated_on"], name: "idx_sector_metrics_unique", unique: true
   end
 
   add_foreign_key "daily_quotes", "companies"
