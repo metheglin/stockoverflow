@@ -47,6 +47,8 @@ class CalculateFinancialMetricsJob < ApplicationJob
     valuation = FinancialMetric.get_valuation_metrics(fv, stock_price)
     ev_ebitda = FinancialMetric.get_ev_ebitda(fv, stock_price)
     surprise = FinancialMetric.get_surprise_metrics(fv, previous_fv)
+    financial_health = FinancialMetric.get_financial_health_metrics(fv)
+    efficiency = FinancialMetric.get_efficiency_metrics(fv)
 
     metric = FinancialMetric.find_or_initialize_by(
       company_id: fv.company_id,
@@ -63,7 +65,7 @@ class CalculateFinancialMetricsJob < ApplicationJob
       **consecutive,
     )
 
-    json_updates = {}.merge(valuation).merge(ev_ebitda).merge(surprise)
+    json_updates = {}.merge(valuation).merge(ev_ebitda).merge(surprise).merge(financial_health).merge(efficiency)
     if json_updates.any?
       metric.data_json = (metric.data_json || {}).merge(json_updates)
     end

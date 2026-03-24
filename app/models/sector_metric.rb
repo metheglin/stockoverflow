@@ -10,6 +10,8 @@ class SectorMetric < ApplicationRecord
 
   DATA_JSON_METRICS = %i[
     per pbr psr ev_ebitda dividend_yield
+    current_ratio debt_to_equity net_debt_to_equity
+    asset_turnover gross_margin sga_ratio
   ].freeze
 
   METRIC_KEYS = (FIXED_COLUMN_METRICS + DATA_JSON_METRICS).freeze

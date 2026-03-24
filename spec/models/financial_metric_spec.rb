@@ -100,6 +100,175 @@ RSpec.describe FinancialMetric do
     end
   end
 
+  describe ".get_financial_health_metrics" do
+    it "全財務健全性指標を算出する" do
+      fv = FinancialValue.new(
+        total_assets: 10_000_000_000,
+        net_assets: 4_000_000_000,
+        cash_and_equivalents: 1_000_000_000,
+      )
+      allow(fv).to receive(:current_assets).and_return(5_000_000_000)
+      allow(fv).to receive(:current_liabilities).and_return(3_000_000_000)
+      allow(fv).to receive(:noncurrent_liabilities).and_return(2_000_000_000)
+      allow(fv).to receive(:shareholders_equity).and_return(3_500_000_000)
+
+      result = FinancialMetric.get_financial_health_metrics(fv)
+
+      # 流動比率 = 5B / 3B = 1.6667
+      expect(result["current_ratio"]).to be_within(0.001).of(1.6667)
+      # 負債資本倍率 = (3B + 2B) / 3.5B = 1.4286
+      expect(result["debt_to_equity"]).to be_within(0.001).of(1.4286)
+      # ネット負債資本倍率 = ((10B - 4B) - 1B) / 3.5B = 5B / 3.5B = 1.4286
+      expect(result["net_debt_to_equity"]).to be_within(0.001).of(1.4286)
+    end
+
+    it "current_assetsがnilの場合はcurrent_ratioをスキップする" do
+      fv = FinancialValue.new(
+        total_assets: 10_000_000_000,
+        net_assets: 4_000_000_000,
+        cash_and_equivalents: 1_000_000_000,
+      )
+      allow(fv).to receive(:current_assets).and_return(nil)
+      allow(fv).to receive(:current_liabilities).and_return(3_000_000_000)
+      allow(fv).to receive(:noncurrent_liabilities).and_return(2_000_000_000)
+      allow(fv).to receive(:shareholders_equity).and_return(3_500_000_000)
+
+      result = FinancialMetric.get_financial_health_metrics(fv)
+
+      expect(result).not_to have_key("current_ratio")
+      expect(result).to have_key("debt_to_equity")
+      expect(result).to have_key("net_debt_to_equity")
+    end
+
+    it "current_liabilitiesが0の場合はcurrent_ratioをスキップする" do
+      fv = FinancialValue.new(
+        total_assets: 10_000_000_000,
+        net_assets: 4_000_000_000,
+        cash_and_equivalents: 1_000_000_000,
+      )
+      allow(fv).to receive(:current_assets).and_return(5_000_000_000)
+      allow(fv).to receive(:current_liabilities).and_return(0)
+      allow(fv).to receive(:noncurrent_liabilities).and_return(2_000_000_000)
+      allow(fv).to receive(:shareholders_equity).and_return(3_500_000_000)
+
+      result = FinancialMetric.get_financial_health_metrics(fv)
+
+      expect(result).not_to have_key("current_ratio")
+    end
+
+    it "shareholders_equityが0の場合はdebt_to_equityとnet_debt_to_equityをスキップする" do
+      fv = FinancialValue.new(
+        total_assets: 10_000_000_000,
+        net_assets: 4_000_000_000,
+        cash_and_equivalents: 1_000_000_000,
+      )
+      allow(fv).to receive(:current_assets).and_return(5_000_000_000)
+      allow(fv).to receive(:current_liabilities).and_return(3_000_000_000)
+      allow(fv).to receive(:noncurrent_liabilities).and_return(2_000_000_000)
+      allow(fv).to receive(:shareholders_equity).and_return(0)
+
+      result = FinancialMetric.get_financial_health_metrics(fv)
+
+      expect(result).to have_key("current_ratio")
+      expect(result).not_to have_key("debt_to_equity")
+      expect(result).not_to have_key("net_debt_to_equity")
+    end
+
+    it "全値がnilの場合は空Hashを返す" do
+      fv = FinancialValue.new(
+        total_assets: nil,
+        net_assets: nil,
+        cash_and_equivalents: nil,
+      )
+      allow(fv).to receive(:current_assets).and_return(nil)
+      allow(fv).to receive(:current_liabilities).and_return(nil)
+      allow(fv).to receive(:noncurrent_liabilities).and_return(nil)
+      allow(fv).to receive(:shareholders_equity).and_return(nil)
+
+      result = FinancialMetric.get_financial_health_metrics(fv)
+
+      expect(result).to eq({})
+    end
+  end
+
+  describe ".get_efficiency_metrics" do
+    it "全効率性指標を算出する" do
+      fv = FinancialValue.new(
+        net_sales: 10_000_000_000,
+        total_assets: 20_000_000_000,
+      )
+      allow(fv).to receive(:gross_profit).and_return(4_000_000_000)
+      allow(fv).to receive(:sga_expenses).and_return(2_500_000_000)
+
+      result = FinancialMetric.get_efficiency_metrics(fv)
+
+      # 総資産回転率 = 10B / 20B = 0.5
+      expect(result["asset_turnover"]).to eq(0.5)
+      # 売上総利益率 = 4B / 10B = 0.4
+      expect(result["gross_margin"]).to eq(0.4)
+      # 販管費率 = 2.5B / 10B = 0.25
+      expect(result["sga_ratio"]).to eq(0.25)
+    end
+
+    it "gross_profitがnilの場合はgross_marginをスキップする" do
+      fv = FinancialValue.new(
+        net_sales: 10_000_000_000,
+        total_assets: 20_000_000_000,
+      )
+      allow(fv).to receive(:gross_profit).and_return(nil)
+      allow(fv).to receive(:sga_expenses).and_return(2_500_000_000)
+
+      result = FinancialMetric.get_efficiency_metrics(fv)
+
+      expect(result).to have_key("asset_turnover")
+      expect(result).not_to have_key("gross_margin")
+      expect(result).to have_key("sga_ratio")
+    end
+
+    it "net_salesが0の場合は全指標をスキップする" do
+      fv = FinancialValue.new(
+        net_sales: 0,
+        total_assets: 20_000_000_000,
+      )
+      allow(fv).to receive(:gross_profit).and_return(4_000_000_000)
+      allow(fv).to receive(:sga_expenses).and_return(2_500_000_000)
+
+      result = FinancialMetric.get_efficiency_metrics(fv)
+
+      expect(result).to have_key("asset_turnover")
+      expect(result).not_to have_key("gross_margin")
+      expect(result).not_to have_key("sga_ratio")
+    end
+
+    it "total_assetsがnilの場合はasset_turnoverをスキップする" do
+      fv = FinancialValue.new(
+        net_sales: 10_000_000_000,
+        total_assets: nil,
+      )
+      allow(fv).to receive(:gross_profit).and_return(4_000_000_000)
+      allow(fv).to receive(:sga_expenses).and_return(2_500_000_000)
+
+      result = FinancialMetric.get_efficiency_metrics(fv)
+
+      expect(result).not_to have_key("asset_turnover")
+      expect(result).to have_key("gross_margin")
+      expect(result).to have_key("sga_ratio")
+    end
+
+    it "全値がnilの場合は空Hashを返す" do
+      fv = FinancialValue.new(
+        net_sales: nil,
+        total_assets: nil,
+      )
+      allow(fv).to receive(:gross_profit).and_return(nil)
+      allow(fv).to receive(:sga_expenses).and_return(nil)
+
+      result = FinancialMetric.get_efficiency_metrics(fv)
+
+      expect(result).to eq({})
+    end
+  end
+
   describe ".get_cf_metrics" do
     it "CF指標を算出する" do
       fv = FinancialValue.new(operating_cf: 5000, investing_cf: -2000)
