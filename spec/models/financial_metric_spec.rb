@@ -1481,4 +1481,123 @@ RSpec.describe FinancialMetric do
       expect(result).not_to have_key("cagr_acceleration_operating_income")
     end
   end
+
+  describe ".get_dupont_metrics" do
+    it "3要素の分解と検算値の一致を検証する" do
+      fv = FinancialValue.new(
+        net_sales: 10_000_000_000,
+        total_assets: 20_000_000_000,
+        net_assets: 8_000_000_000,
+        net_income: 800_000_000,
+      )
+
+      result = FinancialMetric.get_dupont_metrics(fv)
+
+      # net_margin = 800M / 10B = 0.08
+      expect(result["dupont_net_margin"]).to eq(0.08)
+      # asset_turnover = 10B / 20B = 0.5
+      expect(result["dupont_asset_turnover"]).to eq(0.5)
+      # equity_multiplier = 20B / 8B = 2.5
+      expect(result["dupont_equity_multiplier"]).to eq(2.5)
+      # dupont_roe = 0.08 * 0.5 * 2.5 = 0.1
+      expect(result["dupont_roe"]).to be_within(0.0001).of(0.1)
+    end
+
+    it "net_salesが0の場合は空Hashを返す" do
+      fv = FinancialValue.new(
+        net_sales: 0,
+        total_assets: 20_000_000_000,
+        net_assets: 8_000_000_000,
+        net_income: 800_000_000,
+      )
+
+      expect(FinancialMetric.get_dupont_metrics(fv)).to eq({})
+    end
+
+    it "total_assetsが0の場合は空Hashを返す" do
+      fv = FinancialValue.new(
+        net_sales: 10_000_000_000,
+        total_assets: 0,
+        net_assets: 8_000_000_000,
+        net_income: 800_000_000,
+      )
+
+      expect(FinancialMetric.get_dupont_metrics(fv)).to eq({})
+    end
+
+    it "net_assetsが0の場合は空Hashを返す" do
+      fv = FinancialValue.new(
+        net_sales: 10_000_000_000,
+        total_assets: 20_000_000_000,
+        net_assets: 0,
+        net_income: 800_000_000,
+      )
+
+      expect(FinancialMetric.get_dupont_metrics(fv)).to eq({})
+    end
+
+    it "net_salesがnilの場合は空Hashを返す" do
+      fv = FinancialValue.new(
+        net_sales: nil,
+        total_assets: 20_000_000_000,
+        net_assets: 8_000_000_000,
+        net_income: 800_000_000,
+      )
+
+      expect(FinancialMetric.get_dupont_metrics(fv)).to eq({})
+    end
+
+    it "total_assetsがnilの場合は空Hashを返す" do
+      fv = FinancialValue.new(
+        net_sales: 10_000_000_000,
+        total_assets: nil,
+        net_assets: 8_000_000_000,
+        net_income: 800_000_000,
+      )
+
+      expect(FinancialMetric.get_dupont_metrics(fv)).to eq({})
+    end
+
+    it "net_assetsがnilの場合は空Hashを返す" do
+      fv = FinancialValue.new(
+        net_sales: 10_000_000_000,
+        total_assets: 20_000_000_000,
+        net_assets: nil,
+        net_income: 800_000_000,
+      )
+
+      expect(FinancialMetric.get_dupont_metrics(fv)).to eq({})
+    end
+
+    it "net_incomeがnilの場合は空Hashを返す" do
+      fv = FinancialValue.new(
+        net_sales: 10_000_000_000,
+        total_assets: 20_000_000_000,
+        net_assets: 8_000_000_000,
+        net_income: nil,
+      )
+
+      expect(FinancialMetric.get_dupont_metrics(fv)).to eq({})
+    end
+
+    it "赤字企業でも正しくマイナスのROEを算出する" do
+      fv = FinancialValue.new(
+        net_sales: 5_000_000_000,
+        total_assets: 10_000_000_000,
+        net_assets: 4_000_000_000,
+        net_income: -200_000_000,
+      )
+
+      result = FinancialMetric.get_dupont_metrics(fv)
+
+      # net_margin = -200M / 5B = -0.04
+      expect(result["dupont_net_margin"]).to eq(-0.04)
+      # asset_turnover = 5B / 10B = 0.5
+      expect(result["dupont_asset_turnover"]).to eq(0.5)
+      # equity_multiplier = 10B / 4B = 2.5
+      expect(result["dupont_equity_multiplier"]).to eq(2.5)
+      # dupont_roe = -0.04 * 0.5 * 2.5 = -0.05
+      expect(result["dupont_roe"]).to be_within(0.0001).of(-0.05)
+    end
+  end
 end

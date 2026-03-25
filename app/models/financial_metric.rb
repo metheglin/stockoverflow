@@ -34,6 +34,11 @@ class FinancialMetric < ApplicationRecord
     asset_turnover: { type: :decimal },
     gross_margin: { type: :decimal },
     sga_ratio: { type: :decimal },
+    # DuPont ROE分解
+    dupont_net_margin: { type: :decimal },
+    dupont_asset_turnover: { type: :decimal },
+    dupont_equity_multiplier: { type: :decimal },
+    dupont_roe: { type: :decimal },
     # 四半期単独YoY
     standalone_quarter_revenue_yoy: { type: :decimal },
     standalone_quarter_operating_income_yoy: { type: :decimal },
@@ -186,6 +191,42 @@ class FinancialMetric < ApplicationRecord
     end
 
     result
+  end
+
+  # DuPont ROE分解分析を算出する
+  #
+  # ROE = 純利益率(net_margin) x 総資産回転率(asset_turnover) x 財務レバレッジ(equity_multiplier)
+  #
+  # @param fv [FinancialValue] 財務数値
+  # @return [Hash] DuPont分解指標のHash（data_json格納用）
+  #
+  # 例:
+  #   result = FinancialMetric.get_dupont_metrics(fv)
+  #   # => { "dupont_net_margin" => 0.08, "dupont_asset_turnover" => 0.75,
+  #   #      "dupont_equity_multiplier" => 2.5, "dupont_roe" => 0.15 }
+  #
+  def self.get_dupont_metrics(fv)
+    net_sales = fv.net_sales
+    total_assets = fv.total_assets
+    net_assets = fv.net_assets
+    net_income = fv.net_income
+
+    return {} if net_sales.nil? || net_sales == 0
+    return {} if total_assets.nil? || total_assets == 0
+    return {} if net_assets.nil? || net_assets == 0
+    return {} if net_income.nil?
+
+    net_margin = (net_income.to_d / net_sales.to_d).round(4).to_f
+    asset_turnover = (net_sales.to_d / total_assets.to_d).round(4).to_f
+    equity_multiplier = (total_assets.to_d / net_assets.to_d).round(4).to_f
+    dupont_roe = (net_margin * asset_turnover * equity_multiplier).round(4)
+
+    {
+      "dupont_net_margin" => net_margin,
+      "dupont_asset_turnover" => asset_turnover,
+      "dupont_equity_multiplier" => equity_multiplier,
+      "dupont_roe" => dupont_roe,
+    }
   end
 
   # 配当分析指標を算出する
