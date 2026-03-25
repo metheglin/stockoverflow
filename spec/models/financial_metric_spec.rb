@@ -813,4 +813,235 @@ RSpec.describe FinancialMetric do
       expect(result).to eq({})
     end
   end
+
+  describe ".percentile_ranks" do
+    it "均等分布の値に対して正しいpercentile rankを返す" do
+      result = FinancialMetric.percentile_ranks([10, 20, 30, 40, 50])
+      expect(result).to eq([0.0, 25.0, 50.0, 75.0, 100.0])
+    end
+
+    it "逆順の値でも正しいpercentile rankを返す" do
+      result = FinancialMetric.percentile_ranks([50, 40, 30, 20, 10])
+      expect(result).to eq([100.0, 75.0, 50.0, 25.0, 0.0])
+    end
+
+    it "同値を含む場合は平均順位ベースのpercentileを返す" do
+      result = FinancialMetric.percentile_ranks([10, 20, 20, 30])
+      # 20が2つ: rank 1と2の平均=1.5、n-1=3 → 1.5/3*100=50.0
+      expect(result[0]).to eq(0.0)
+      expect(result[1]).to eq(50.0)
+      expect(result[2]).to eq(50.0)
+      expect(result[3]).to eq(100.0)
+    end
+
+    it "nilを含む場合はnilを保持し、非nil値のみでpercentileを算出する" do
+      result = FinancialMetric.percentile_ranks([10, nil, 30, 20])
+      expect(result[0]).to eq(0.0)
+      expect(result[1]).to be_nil
+      expect(result[2]).to eq(100.0)
+      expect(result[3]).to eq(50.0)
+    end
+
+    it "全てnilの場合は全てnilを返す" do
+      result = FinancialMetric.percentile_ranks([nil, nil, nil])
+      expect(result).to eq([nil, nil, nil])
+    end
+
+    it "要素が1つの場合は50.0を返す" do
+      result = FinancialMetric.percentile_ranks([42])
+      expect(result).to eq([50.0])
+    end
+
+    it "空配列に対して空配列を返す" do
+      result = FinancialMetric.percentile_ranks([])
+      expect(result).to eq([])
+    end
+
+    it "全て同値の場合は全て同じpercentileを返す" do
+      result = FinancialMetric.percentile_ranks([5, 5, 5])
+      # rank 0,1,2の平均=1.0, n-1=2 → 1.0/2*100=50.0
+      expect(result).to eq([50.0, 50.0, 50.0])
+    end
+  end
+
+  describe ".get_growth_scores" do
+    it "複数メトリクスに対して成長性スコアを算出する" do
+      metrics = [
+        FinancialMetric.new(id: 1, revenue_yoy: 0.2, operating_income_yoy: 0.3, eps_yoy: 0.15,
+                            consecutive_revenue_growth: 3, consecutive_profit_growth: 2),
+        FinancialMetric.new(id: 2, revenue_yoy: 0.05, operating_income_yoy: 0.1, eps_yoy: 0.05,
+                            consecutive_revenue_growth: 1, consecutive_profit_growth: 0),
+        FinancialMetric.new(id: 3, revenue_yoy: 0.1, operating_income_yoy: 0.2, eps_yoy: 0.1,
+                            consecutive_revenue_growth: 2, consecutive_profit_growth: 1),
+      ]
+
+      result = FinancialMetric.get_growth_scores(metrics)
+
+      expect(result.keys).to contain_exactly(1, 2, 3)
+      # 全指標で最高のmetric 1が最高スコア
+      expect(result[1]).to eq(100.0)
+      # 全指標で最低のmetric 2が最低スコア
+      expect(result[2]).to eq(0.0)
+      # 中間のmetric 3
+      expect(result[3]).to eq(50.0)
+    end
+
+    it "nil指標がある場合はウェイトを再配分する" do
+      metrics = [
+        FinancialMetric.new(id: 1, revenue_yoy: 0.2, operating_income_yoy: nil, eps_yoy: nil,
+                            consecutive_revenue_growth: 3, consecutive_profit_growth: 2),
+        FinancialMetric.new(id: 2, revenue_yoy: 0.05, operating_income_yoy: nil, eps_yoy: nil,
+                            consecutive_revenue_growth: 1, consecutive_profit_growth: 1),
+      ]
+
+      result = FinancialMetric.get_growth_scores(metrics)
+
+      # nil指標を除外してウェイト再配分されるので、有効な指標のみでスコアが決まる
+      expect(result[1]).to eq(100.0)
+      expect(result[2]).to eq(0.0)
+    end
+
+    it "空配列に対して空Hashを返す" do
+      expect(FinancialMetric.get_growth_scores([])).to eq({})
+    end
+  end
+
+  describe ".get_quality_scores" do
+    it "複数メトリクスに対して質スコアを算出する" do
+      metrics = [
+        FinancialMetric.new(id: 1, roe: 0.15, operating_margin: 0.20, roa: 0.08,
+                            operating_cf_positive: true, investing_cf_negative: true,
+                            free_cf_positive: true),
+        FinancialMetric.new(id: 2, roe: 0.05, operating_margin: 0.08, roa: 0.02,
+                            operating_cf_positive: false, investing_cf_negative: false,
+                            free_cf_positive: false),
+        FinancialMetric.new(id: 3, roe: 0.10, operating_margin: 0.12, roa: 0.05,
+                            operating_cf_positive: true, investing_cf_negative: false,
+                            free_cf_positive: true),
+      ]
+
+      result = FinancialMetric.get_quality_scores(metrics)
+
+      expect(result.keys).to contain_exactly(1, 2, 3)
+      # 全指標で最高のmetric 1が最高スコア（boolean指標のtieにより厳密100にはならない）
+      expect(result[1]).to be > result[3]
+      expect(result[3]).to be > result[2]
+      expect(result[2]).to eq(0.0)
+    end
+
+    it "CF指標がnilの場合はウェイトを再配分する" do
+      metrics = [
+        FinancialMetric.new(id: 1, roe: 0.15, operating_margin: 0.20, roa: 0.08,
+                            operating_cf_positive: nil, investing_cf_negative: nil,
+                            free_cf_positive: nil),
+        FinancialMetric.new(id: 2, roe: 0.05, operating_margin: 0.08, roa: 0.02,
+                            operating_cf_positive: nil, investing_cf_negative: nil,
+                            free_cf_positive: nil),
+      ]
+
+      result = FinancialMetric.get_quality_scores(metrics)
+
+      expect(result[1]).to eq(100.0)
+      expect(result[2]).to eq(0.0)
+    end
+  end
+
+  describe ".get_value_scores" do
+    it "複数メトリクスに対して割安度スコアを算出する" do
+      m1 = FinancialMetric.new(id: 1)
+      m1.data_json = { "per" => 8.0, "pbr" => 0.8, "ev_ebitda" => 5.0, "dividend_yield" => 0.04 }
+      m2 = FinancialMetric.new(id: 2)
+      m2.data_json = { "per" => 25.0, "pbr" => 3.0, "ev_ebitda" => 15.0, "dividend_yield" => 0.01 }
+      m3 = FinancialMetric.new(id: 3)
+      m3.data_json = { "per" => 15.0, "pbr" => 1.5, "ev_ebitda" => 10.0, "dividend_yield" => 0.02 }
+
+      result = FinancialMetric.get_value_scores([m1, m2, m3])
+
+      # m1は低PER/PBR/EV_EBITDA + 高配当 → 最も割安
+      expect(result[1]).to eq(100.0)
+      # m2は高PER/PBR/EV_EBITDA + 低配当 → 最も割高
+      expect(result[2]).to eq(0.0)
+    end
+
+    it "PERが0以下の場合はnilとして扱いウェイト再配分する" do
+      m1 = FinancialMetric.new(id: 1)
+      m1.data_json = { "per" => -5.0, "pbr" => 0.8, "ev_ebitda" => 5.0, "dividend_yield" => 0.03 }
+      m2 = FinancialMetric.new(id: 2)
+      m2.data_json = { "per" => -10.0, "pbr" => 2.0, "ev_ebitda" => 12.0, "dividend_yield" => 0.01 }
+
+      result = FinancialMetric.get_value_scores([m1, m2])
+
+      # PERは両方nil扱い、残りの指標でm1の方が割安
+      expect(result[1]).to eq(100.0)
+      expect(result[2]).to eq(0.0)
+    end
+  end
+
+  describe ".get_composite_scores" do
+    it "3つのサブスコアから総合スコアを算出する" do
+      m1 = FinancialMetric.new(id: 1)
+      m1.data_json = { "growth_score" => 80.0, "quality_score" => 90.0, "value_score" => 70.0 }
+      m2 = FinancialMetric.new(id: 2)
+      m2.data_json = { "growth_score" => 20.0, "quality_score" => 30.0, "value_score" => 40.0 }
+      m3 = FinancialMetric.new(id: 3)
+      m3.data_json = { "growth_score" => 50.0, "quality_score" => 60.0, "value_score" => 55.0 }
+
+      result = FinancialMetric.get_composite_scores([m1, m2, m3])
+
+      expect(result[1]).to eq(100.0)
+      expect(result[2]).to eq(0.0)
+      expect(result[3]).to eq(50.0)
+    end
+
+    it "一部のサブスコアがnilでもウェイト再配分して算出する" do
+      m1 = FinancialMetric.new(id: 1)
+      m1.data_json = { "growth_score" => 80.0, "quality_score" => 90.0, "value_score" => nil }
+      m2 = FinancialMetric.new(id: 2)
+      m2.data_json = { "growth_score" => 20.0, "quality_score" => 30.0, "value_score" => nil }
+
+      result = FinancialMetric.get_composite_scores([m1, m2])
+
+      expect(result[1]).to eq(100.0)
+      expect(result[2]).to eq(0.0)
+    end
+
+    it "全サブスコアがnilの場合はnilを返す" do
+      m1 = FinancialMetric.new(id: 1)
+      m1.data_json = { "growth_score" => nil, "quality_score" => nil, "value_score" => nil }
+
+      result = FinancialMetric.get_composite_scores([m1])
+
+      expect(result[1]).to be_nil
+    end
+  end
+
+  describe ".compute_weighted_scores" do
+    it "全指標が同値の場合は全て同じスコアになる" do
+      metrics = [
+        FinancialMetric.new(id: 1, revenue_yoy: 0.1, operating_income_yoy: 0.1, eps_yoy: 0.1,
+                            consecutive_revenue_growth: 1, consecutive_profit_growth: 1),
+        FinancialMetric.new(id: 2, revenue_yoy: 0.1, operating_income_yoy: 0.1, eps_yoy: 0.1,
+                            consecutive_revenue_growth: 1, consecutive_profit_growth: 1),
+        FinancialMetric.new(id: 3, revenue_yoy: 0.1, operating_income_yoy: 0.1, eps_yoy: 0.1,
+                            consecutive_revenue_growth: 1, consecutive_profit_growth: 1),
+      ]
+
+      result = FinancialMetric.get_growth_scores(metrics)
+
+      expect(result[1]).to eq(result[2])
+      expect(result[2]).to eq(result[3])
+      expect(result[1]).to eq(50.0)
+    end
+
+    it "全指標がnilの場合はnilスコアを返す" do
+      metrics = [
+        FinancialMetric.new(id: 1, revenue_yoy: nil, operating_income_yoy: nil, eps_yoy: nil,
+                            consecutive_revenue_growth: nil, consecutive_profit_growth: nil),
+      ]
+
+      result = FinancialMetric.get_growth_scores(metrics)
+
+      expect(result[1]).to be_nil
+    end
+  end
 end

@@ -13,6 +13,8 @@ class CalculateFinancialMetricsJob < ApplicationJob
       calculate_metrics_for(fv)
     end
 
+    calculate_scores(company_id: company_id)
+
     log_result
   end
 
@@ -140,6 +142,54 @@ class CalculateFinancialMetricsJob < ApplicationJob
       .where(traded_on: (fv.fiscal_year_end - 7.days)..(fv.fiscal_year_end + 7.days))
       .order(Arel.sql("ABS(JULIANDAY(traded_on) - JULIANDAY('#{fv.fiscal_year_end}'))"))
       .pick(:adjusted_close)
+  end
+
+  # 全企業分のスコアをバッチで算出し data_json に格納する
+  #
+  # percentile rank は同一 fiscal_year_end + period_type + scope の母集団で算出する。
+  # company_id 指定時もスコア計算は全企業を母集団として再計算する。
+  def calculate_scores(company_id: nil)
+    FinancialMetric
+      .select(:fiscal_year_end, :period_type, :scope)
+      .distinct
+      .each do |group|
+        metrics = FinancialMetric
+          .where(
+            fiscal_year_end: group.fiscal_year_end,
+            period_type: group.period_type,
+            scope: group.scope,
+          )
+          .to_a
+
+        next if metrics.empty?
+
+        growth_scores = FinancialMetric.get_growth_scores(metrics)
+        quality_scores = FinancialMetric.get_quality_scores(metrics)
+        value_scores = FinancialMetric.get_value_scores(metrics)
+
+        # growth/quality/value を各 metric の data_json に反映
+        metrics.each do |metric|
+          json = (metric.data_json || {}).dup
+          json["growth_score"] = growth_scores[metric.id]
+          json["quality_score"] = quality_scores[metric.id]
+          json["value_score"] = value_scores[metric.id]
+          metric.data_json = json
+        end
+
+        # composite score は growth/quality/value が格納済みの状態で算出
+        composite_scores = FinancialMetric.get_composite_scores(metrics)
+
+        metrics.each do |metric|
+          json = (metric.data_json || {}).dup
+          json["composite_score"] = composite_scores[metric.id]
+          metric.data_json = json
+          metric.save! if metric.changed?
+        end
+      end
+  rescue => e
+    Rails.logger.error(
+      "[CalculateFinancialMetricsJob] Score calculation failed: #{e.message}"
+    )
   end
 
   def log_result

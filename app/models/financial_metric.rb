@@ -38,6 +38,11 @@ class FinancialMetric < ApplicationRecord
     standalone_quarter_revenue_yoy: { type: :decimal },
     standalone_quarter_operating_income_yoy: { type: :decimal },
     standalone_quarter_net_income_yoy: { type: :decimal },
+    # 複合スコア
+    growth_score: { type: :decimal },
+    quality_score: { type: :decimal },
+    value_score: { type: :decimal },
+    composite_score: { type: :decimal },
   }
 
   # 2つの FinancialValue から成長性指標（YoY）を算出する
@@ -389,6 +394,200 @@ class FinancialMetric < ApplicationRecord
 
       yoy = compute_yoy(current_standalone, prior_standalone)
       result[metric_key] = yoy.to_f if yoy
+    end
+
+    result
+  end
+
+  # スコア計算用の重み定数
+  GROWTH_SCORE_WEIGHTS = {
+    revenue_yoy: 0.25,
+    operating_income_yoy: 0.25,
+    eps_yoy: 0.20,
+    consecutive_revenue_growth: 0.15,
+    consecutive_profit_growth: 0.15,
+  }.freeze
+
+  QUALITY_SCORE_WEIGHTS = {
+    roe: 0.25,
+    operating_margin: 0.25,
+    cf_health: 0.20,
+    free_cf_positive: 0.15,
+    roa: 0.15,
+  }.freeze
+
+  VALUE_SCORE_WEIGHTS = {
+    per_inverse: 0.30,
+    pbr_inverse: 0.30,
+    ev_ebitda_inverse: 0.20,
+    dividend_yield: 0.20,
+  }.freeze
+
+  COMPOSITE_SCORE_WEIGHTS = {
+    growth_score: 0.35,
+    quality_score: 0.40,
+    value_score: 0.25,
+  }.freeze
+
+  # 値の配列からpercentile rankを算出する
+  #
+  # 各値について全体中の相対位置を 0〜100 で返す。
+  # 同値はすべて同じpercentile（平均順位ベース）となる。
+  # nil は結果でも nil として保持される。
+  #
+  # @param values [Array<Numeric, nil>] 値の配列
+  # @return [Array<Float, nil>] percentile rank（0〜100）の配列
+  #
+  # 例:
+  #   percentile_ranks([10, 20, 30, 40, 50])
+  #   # => [0.0, 25.0, 50.0, 75.0, 100.0]
+  #
+  def self.percentile_ranks(values)
+    non_nil_values = values.each_with_index.reject { |v, _| v.nil? }.map { |v, i| [v.to_f, i] }
+    return values.map { nil } if non_nil_values.empty?
+
+    result = Array.new(values.size)
+
+    if non_nil_values.size == 1
+      result[non_nil_values.first[1]] = 50.0
+      return result
+    end
+
+    sorted = non_nil_values.sort_by { |v, _| v }
+    n = sorted.size
+
+    # 同値をグループ化して平均順位を割り当て
+    rank_map = {}
+    i = 0
+    while i < n
+      j = i
+      j += 1 while j < n && sorted[j][0] == sorted[i][0]
+      avg_rank = (i...j).sum.to_f / (j - i)
+      (i...j).each { |k| rank_map[sorted[k][1]] = avg_rank }
+      i = j
+    end
+
+    rank_map.each do |original_index, rank|
+      result[original_index] = (rank / (n - 1).to_f * 100.0).round(2)
+    end
+
+    result
+  end
+
+  # Growth Score（成長性スコア）を算出する
+  #
+  # 全企業の FinancialMetric をバッチで受け取り、percentile rank ベースで
+  # 各指標を 0〜100 に正規化し、重み付き加重平均でスコアを算出する。
+  #
+  # @param metrics [Array<FinancialMetric>] 対象メトリクス群
+  # @return [Hash{Integer => Float}] metric.id => score のHash
+  #
+  def self.get_growth_scores(metrics)
+    compute_weighted_scores(metrics, GROWTH_SCORE_WEIGHTS) do |metric, key|
+      case key
+      when :revenue_yoy then metric.revenue_yoy&.to_f
+      when :operating_income_yoy then metric.operating_income_yoy&.to_f
+      when :eps_yoy then metric.eps_yoy&.to_f
+      when :consecutive_revenue_growth then metric.consecutive_revenue_growth&.to_f
+      when :consecutive_profit_growth then metric.consecutive_profit_growth&.to_f
+      end
+    end
+  end
+
+  # Quality Score（質スコア）を算出する
+  #
+  # @param metrics [Array<FinancialMetric>] 対象メトリクス群
+  # @return [Hash{Integer => Float}] metric.id => score のHash
+  #
+  def self.get_quality_scores(metrics)
+    compute_weighted_scores(metrics, QUALITY_SCORE_WEIGHTS) do |metric, key|
+      case key
+      when :roe then metric.roe&.to_f
+      when :operating_margin then metric.operating_margin&.to_f
+      when :cf_health
+        op = metric.operating_cf_positive
+        inv = metric.investing_cf_negative
+        (op.nil? || inv.nil?) ? nil : ((op ? 1.0 : 0.0) + (inv ? 1.0 : 0.0))
+      when :free_cf_positive
+        metric.free_cf_positive.nil? ? nil : (metric.free_cf_positive ? 1.0 : 0.0)
+      when :roa then metric.roa&.to_f
+      end
+    end
+  end
+
+  # Value Score（割安度スコア）を算出する
+  #
+  # PER/PBR/EV_EBITDA は低いほど割安なので逆数にしてからpercentile化する。
+  #
+  # @param metrics [Array<FinancialMetric>] 対象メトリクス群
+  # @return [Hash{Integer => Float}] metric.id => score のHash
+  #
+  def self.get_value_scores(metrics)
+    compute_weighted_scores(metrics, VALUE_SCORE_WEIGHTS) do |metric, key|
+      case key
+      when :per_inverse
+        per = metric.per&.to_f
+        (per.nil? || per <= 0) ? nil : (1.0 / per)
+      when :pbr_inverse
+        pbr = metric.pbr&.to_f
+        (pbr.nil? || pbr <= 0) ? nil : (1.0 / pbr)
+      when :ev_ebitda_inverse
+        ev = metric.ev_ebitda&.to_f
+        (ev.nil? || ev <= 0) ? nil : (1.0 / ev)
+      when :dividend_yield
+        metric.dividend_yield&.to_f
+      end
+    end
+  end
+
+  # Composite Score（総合スコア）を算出する
+  #
+  # Growth/Quality/Value の各スコアが data_json に格納済みであることを前提とする。
+  #
+  # @param metrics [Array<FinancialMetric>] 対象メトリクス群（スコア格納済み）
+  # @return [Hash{Integer => Float}] metric.id => score のHash
+  #
+  def self.get_composite_scores(metrics)
+    compute_weighted_scores(metrics, COMPOSITE_SCORE_WEIGHTS) do |metric, key|
+      case key
+      when :growth_score then metric.growth_score&.to_f
+      when :quality_score then metric.quality_score&.to_f
+      when :value_score then metric.value_score&.to_f
+      end
+    end
+  end
+
+  # 重み付きpercentileスコアを汎用的に算出する
+  #
+  # @param metrics [Array<FinancialMetric>] 対象メトリクス群
+  # @param weights [Hash{Symbol => Float}] 指標名と重みのHash
+  # @yield [metric, key] 各指標の値を返すブロック
+  # @return [Hash{Integer => Float}] metric.id => score のHash
+  #
+  def self.compute_weighted_scores(metrics, weights, &value_extractor)
+    return {} if metrics.empty?
+
+    # 各指標のpercentile rankを算出
+    percentile_data = {}
+    weights.each_key do |key|
+      raw_values = metrics.map { |m| value_extractor.call(m, key) }
+      percentile_data[key] = percentile_ranks(raw_values)
+    end
+
+    # 各メトリクスについて加重平均スコアを算出
+    result = {}
+    metrics.each_with_index do |metric, idx|
+      total_weight = 0.0
+      weighted_sum = 0.0
+
+      weights.each do |key, weight|
+        pct = percentile_data[key][idx]
+        next if pct.nil?
+        weighted_sum += pct * weight
+        total_weight += weight
+      end
+
+      result[metric.id] = total_weight > 0 ? (weighted_sum / total_weight).round(2) : nil
     end
 
     result
