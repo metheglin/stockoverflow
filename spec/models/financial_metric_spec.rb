@@ -1207,4 +1207,278 @@ RSpec.describe FinancialMetric do
       expect(result[1]).to be_nil
     end
   end
+
+  describe ".compute_cagr" do
+    it "正常なCAGRを算出する" do
+      # 100 -> 133.1 over 3 years: (133.1/100)^(1/3) - 1 ≈ 0.1
+      result = FinancialMetric.compute_cagr(133.1, 100, 3)
+      expect(result).to be_within(0.001).of(0.1)
+    end
+
+    it "5年CAGRを算出する" do
+      # 100 -> 161.051 over 5 years: (161.051/100)^(1/5) - 1 ≈ 0.1
+      result = FinancialMetric.compute_cagr(161.051, 100, 5)
+      expect(result).to be_within(0.001).of(0.1)
+    end
+
+    it "成長なし（同一値）の場合はCAGR=0を返す" do
+      result = FinancialMetric.compute_cagr(100, 100, 3)
+      expect(result).to eq(0.0)
+    end
+
+    it "マイナス成長の場合は負のCAGRを返す" do
+      # 100 -> 50 over 3 years
+      result = FinancialMetric.compute_cagr(50, 100, 3)
+      expect(result).to be < 0
+    end
+
+    it "開始値が0の場合はnilを返す" do
+      expect(FinancialMetric.compute_cagr(100, 0, 3)).to be_nil
+    end
+
+    it "開始値が負の場合はnilを返す" do
+      expect(FinancialMetric.compute_cagr(100, -50, 3)).to be_nil
+    end
+
+    it "終了値がnilの場合はnilを返す" do
+      expect(FinancialMetric.compute_cagr(nil, 100, 3)).to be_nil
+    end
+
+    it "開始値がnilの場合はnilを返す" do
+      expect(FinancialMetric.compute_cagr(100, nil, 3)).to be_nil
+    end
+
+    it "年数が0の場合はnilを返す" do
+      expect(FinancialMetric.compute_cagr(100, 50, 0)).to be_nil
+    end
+
+    it "終了値が負で開始値が正の場合はnilを返す" do
+      expect(FinancialMetric.compute_cagr(-50, 100, 3)).to be_nil
+    end
+  end
+
+  describe ".get_cagr_metrics" do
+    it "3年分・5年分のデータがある場合に全CAGRを算出する" do
+      # 3年CAGR 10%: start * 1.1^3 = start * 1.331
+      current_fv = FinancialValue.new(
+        net_sales: 13310, operating_income: 2662, net_income: 1331, eps: BigDecimal("133.1"),
+        fiscal_year_end: Date.new(2026, 3, 31),
+      )
+
+      fv_3y_ago = FinancialValue.new(
+        net_sales: 10000, operating_income: 2000, net_income: 1000, eps: BigDecimal("100.0"),
+        fiscal_year_end: Date.new(2023, 3, 31),
+      )
+
+      fv_5y_ago = FinancialValue.new(
+        net_sales: 8000, operating_income: 1600, net_income: 800, eps: BigDecimal("80.0"),
+        fiscal_year_end: Date.new(2021, 3, 31),
+      )
+
+      historical_fvs = [fv_3y_ago, fv_5y_ago]
+
+      result = FinancialMetric.get_cagr_metrics(current_fv, historical_fvs)
+
+      expect(result["revenue_cagr_3y"]).to be_within(0.002).of(0.1)
+      expect(result["operating_income_cagr_3y"]).to be_within(0.002).of(0.1)
+      expect(result["net_income_cagr_3y"]).to be_within(0.002).of(0.1)
+      expect(result["eps_cagr_3y"]).to be_within(0.002).of(0.1)
+
+      expect(result["revenue_cagr_5y"]).to be_a(Float)
+      expect(result["operating_income_cagr_5y"]).to be_a(Float)
+      expect(result["net_income_cagr_5y"]).to be_a(Float)
+      expect(result["eps_cagr_5y"]).to be_a(Float)
+    end
+
+    it "データ不足（2年分しかない場合）に5年CAGRがnilであること" do
+      current_fv = FinancialValue.new(
+        net_sales: 1210, operating_income: 240,
+        net_income: 180, eps: BigDecimal("66.0"),
+        fiscal_year_end: Date.new(2026, 3, 31),
+      )
+
+      fv_2y_ago = FinancialValue.new(
+        net_sales: 1000, operating_income: 200,
+        net_income: 150, eps: BigDecimal("55.0"),
+        fiscal_year_end: Date.new(2024, 3, 31),
+      )
+
+      historical_fvs = [fv_2y_ago]
+
+      result = FinancialMetric.get_cagr_metrics(current_fv, historical_fvs)
+
+      # 2年前のデータは3年CAGRの範囲外（±45日）なので該当なし
+      expect(result).not_to have_key("revenue_cagr_3y")
+      expect(result).not_to have_key("revenue_cagr_5y")
+    end
+
+    it "全期間同一値の場合にCAGR=0であること" do
+      current_fv = FinancialValue.new(
+        net_sales: 1000, operating_income: 200,
+        net_income: 150, eps: BigDecimal("55.0"),
+        fiscal_year_end: Date.new(2026, 3, 31),
+      )
+
+      fv_3y_ago = FinancialValue.new(
+        net_sales: 1000, operating_income: 200,
+        net_income: 150, eps: BigDecimal("55.0"),
+        fiscal_year_end: Date.new(2023, 3, 31),
+      )
+
+      historical_fvs = [fv_3y_ago]
+
+      result = FinancialMetric.get_cagr_metrics(current_fv, historical_fvs)
+
+      expect(result["revenue_cagr_3y"]).to eq(0.0)
+      expect(result["operating_income_cagr_3y"]).to eq(0.0)
+      expect(result["net_income_cagr_3y"]).to eq(0.0)
+      expect(result["eps_cagr_3y"]).to eq(0.0)
+    end
+
+    it "開始値が0の指標のみnilとなること" do
+      current_fv = FinancialValue.new(
+        net_sales: 1000, operating_income: 200,
+        net_income: 150, eps: BigDecimal("55.0"),
+        fiscal_year_end: Date.new(2026, 3, 31),
+      )
+
+      fv_3y_ago = FinancialValue.new(
+        net_sales: 0, operating_income: 200,
+        net_income: 150, eps: BigDecimal("55.0"),
+        fiscal_year_end: Date.new(2023, 3, 31),
+      )
+
+      historical_fvs = [fv_3y_ago]
+
+      result = FinancialMetric.get_cagr_metrics(current_fv, historical_fvs)
+
+      expect(result).not_to have_key("revenue_cagr_3y")
+      expect(result["operating_income_cagr_3y"]).to eq(0.0)
+    end
+
+    it "開始値が負の指標はnilとなること" do
+      current_fv = FinancialValue.new(
+        net_sales: 1000, operating_income: 200,
+        net_income: 150, eps: BigDecimal("55.0"),
+        fiscal_year_end: Date.new(2026, 3, 31),
+      )
+
+      fv_3y_ago = FinancialValue.new(
+        net_sales: 1000, operating_income: -100,
+        net_income: 150, eps: BigDecimal("55.0"),
+        fiscal_year_end: Date.new(2023, 3, 31),
+      )
+
+      historical_fvs = [fv_3y_ago]
+
+      result = FinancialMetric.get_cagr_metrics(current_fv, historical_fvs)
+
+      expect(result["revenue_cagr_3y"]).to eq(0.0)
+      expect(result).not_to have_key("operating_income_cagr_3y")
+    end
+
+    it "historical_fvsが空の場合は空Hashを返す" do
+      current_fv = FinancialValue.new(
+        net_sales: 1000, fiscal_year_end: Date.new(2026, 3, 31),
+      )
+
+      expect(FinancialMetric.get_cagr_metrics(current_fv, [])).to eq({})
+    end
+  end
+
+  describe ".find_fv_for_period" do
+    it "指定年数前のFinancialValueを返す" do
+      current_fv = FinancialValue.new(fiscal_year_end: Date.new(2026, 3, 31))
+      fv_3y = FinancialValue.new(fiscal_year_end: Date.new(2023, 3, 31))
+      fv_5y = FinancialValue.new(fiscal_year_end: Date.new(2021, 3, 31))
+
+      result = FinancialMetric.find_fv_for_period(current_fv, [fv_3y, fv_5y], 3)
+      expect(result).to eq(fv_3y)
+
+      result = FinancialMetric.find_fv_for_period(current_fv, [fv_3y, fv_5y], 5)
+      expect(result).to eq(fv_5y)
+    end
+
+    it "±45日の範囲内であればマッチする" do
+      current_fv = FinancialValue.new(fiscal_year_end: Date.new(2026, 3, 31))
+      fv_shifted = FinancialValue.new(fiscal_year_end: Date.new(2023, 4, 15))
+
+      result = FinancialMetric.find_fv_for_period(current_fv, [fv_shifted], 3)
+      expect(result).to eq(fv_shifted)
+    end
+
+    it "±45日の範囲外であればnilを返す" do
+      current_fv = FinancialValue.new(fiscal_year_end: Date.new(2026, 3, 31))
+      fv_far = FinancialValue.new(fiscal_year_end: Date.new(2023, 6, 30))
+
+      result = FinancialMetric.find_fv_for_period(current_fv, [fv_far], 3)
+      expect(result).to be_nil
+    end
+  end
+
+  describe ".get_cagr_acceleration" do
+    it "CAGR加速度を算出する" do
+      current_cagr = {
+        "revenue_cagr_3y" => 0.15,
+        "operating_income_cagr_3y" => 0.20,
+        "net_income_cagr_3y" => 0.18,
+        "eps_cagr_3y" => 0.17,
+      }
+
+      prior_metric = FinancialMetric.new
+      prior_metric.data_json = {
+        "revenue_cagr_3y" => 0.10,
+        "operating_income_cagr_3y" => 0.12,
+        "net_income_cagr_3y" => 0.11,
+        "eps_cagr_3y" => 0.09,
+      }
+
+      result = FinancialMetric.get_cagr_acceleration(current_cagr, prior_metric)
+
+      expect(result["cagr_acceleration_revenue"]).to be_within(0.0001).of(0.05)
+      expect(result["cagr_acceleration_operating_income"]).to be_within(0.0001).of(0.08)
+      expect(result["cagr_acceleration_net_income"]).to be_within(0.0001).of(0.07)
+      expect(result["cagr_acceleration_eps"]).to be_within(0.0001).of(0.08)
+    end
+
+    it "prior_metricがnilの場合は空Hashを返す" do
+      current_cagr = { "revenue_cagr_3y" => 0.15 }
+      result = FinancialMetric.get_cagr_acceleration(current_cagr, nil)
+      expect(result).to eq({})
+    end
+
+    it "当期のCAGRがnilの指標はスキップする" do
+      current_cagr = {
+        "revenue_cagr_3y" => 0.15,
+      }
+
+      prior_metric = FinancialMetric.new
+      prior_metric.data_json = {
+        "revenue_cagr_3y" => 0.10,
+        "operating_income_cagr_3y" => 0.12,
+      }
+
+      result = FinancialMetric.get_cagr_acceleration(current_cagr, prior_metric)
+
+      expect(result["cagr_acceleration_revenue"]).to be_within(0.0001).of(0.05)
+      expect(result).not_to have_key("cagr_acceleration_operating_income")
+    end
+
+    it "前期のCAGRがnilの指標はスキップする" do
+      current_cagr = {
+        "revenue_cagr_3y" => 0.15,
+        "operating_income_cagr_3y" => 0.20,
+      }
+
+      prior_metric = FinancialMetric.new
+      prior_metric.data_json = {
+        "revenue_cagr_3y" => 0.10,
+      }
+
+      result = FinancialMetric.get_cagr_acceleration(current_cagr, prior_metric)
+
+      expect(result["cagr_acceleration_revenue"]).to be_within(0.0001).of(0.05)
+      expect(result).not_to have_key("cagr_acceleration_operating_income")
+    end
+  end
 end
