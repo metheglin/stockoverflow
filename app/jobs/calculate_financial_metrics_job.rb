@@ -51,6 +51,7 @@ class CalculateFinancialMetricsJob < ApplicationJob
     surprise = FinancialMetric.get_surprise_metrics(fv, previous_fv)
     financial_health = FinancialMetric.get_financial_health_metrics(fv)
     efficiency = FinancialMetric.get_efficiency_metrics(fv)
+    dividend = FinancialMetric.get_dividend_metrics(fv, previous_fv, previous_metric)
 
     quarterly_yoy = {}
     unless fv.annual?
@@ -78,7 +79,7 @@ class CalculateFinancialMetricsJob < ApplicationJob
       **consecutive,
     )
 
-    json_updates = {}.merge(valuation).merge(ev_ebitda).merge(surprise).merge(financial_health).merge(efficiency).merge(quarterly_yoy)
+    json_updates = {}.merge(valuation).merge(ev_ebitda).merge(surprise).merge(financial_health).merge(efficiency).merge(dividend).merge(quarterly_yoy)
     if json_updates.any?
       metric.data_json = (metric.data_json || {}).merge(json_updates)
     end

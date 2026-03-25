@@ -38,6 +38,10 @@ class FinancialMetric < ApplicationRecord
     standalone_quarter_revenue_yoy: { type: :decimal },
     standalone_quarter_operating_income_yoy: { type: :decimal },
     standalone_quarter_net_income_yoy: { type: :decimal },
+    # 配当分析
+    payout_ratio: { type: :decimal },
+    dividend_growth_rate: { type: :decimal },
+    consecutive_dividend_growth: { type: :integer },
     # 複合スコア
     growth_score: { type: :decimal },
     quality_score: { type: :decimal },
@@ -168,6 +172,58 @@ class FinancialMetric < ApplicationRecord
     end
 
     result
+  end
+
+  # 配当分析指標を算出する
+  #
+  # @param current_fv [FinancialValue] 当期の財務数値
+  # @param prior_fv [FinancialValue, nil] 前期の財務数値
+  # @param prior_metric [FinancialMetric, nil] 前期の指標
+  # @return [Hash] 配当分析指標のHash（data_json格納用）
+  #
+  # 例:
+  #   result = FinancialMetric.get_dividend_metrics(current_fv, prior_fv, prior_metric)
+  #   # => { "payout_ratio" => 35.5, "dividend_growth_rate" => 0.1, "consecutive_dividend_growth" => 3 }
+  #
+  def self.get_dividend_metrics(current_fv, prior_fv, prior_metric)
+    dps = current_fv.dividend_per_share_annual
+    eps = current_fv.eps
+    prior_dps = prior_fv&.dividend_per_share_annual
+
+    result = {}
+    result["payout_ratio"] = get_payout_ratio(dps, eps)
+    result["dividend_growth_rate"] = compute_yoy(dps, prior_dps)&.to_f
+    result["consecutive_dividend_growth"] = get_consecutive_dividend_growth(dps, prior_dps, prior_metric)
+    result.compact
+  end
+
+  # 配当性向を算出する
+  #
+  # @param dps [Numeric, nil] 1株あたり配当金
+  # @param eps [Numeric, nil] 1株あたり利益
+  # @return [Float, nil] 配当性向（%）。EPSがマイナスまたはゼロの場合nil
+  def self.get_payout_ratio(dps, eps)
+    return nil if dps.nil? || eps.nil?
+    return nil if eps.to_d <= 0
+
+    (dps.to_d / eps.to_d * 100).round(2).to_f
+  end
+
+  # 連続増配期間を算出する
+  #
+  # @param dps [Numeric, nil] 当期DPS
+  # @param prior_dps [Numeric, nil] 前期DPS
+  # @param prior_metric [FinancialMetric, nil] 前期の指標
+  # @return [Integer, nil] 連続増配期間。判定不能な場合nil
+  def self.get_consecutive_dividend_growth(dps, prior_dps, prior_metric)
+    return nil if dps.nil? || prior_dps.nil?
+
+    if dps.to_d > prior_dps.to_d
+      prev_count = prior_metric&.consecutive_dividend_growth || 0
+      prev_count + 1
+    else
+      0
+    end
   end
 
   # 連続増収増益期数を算出する

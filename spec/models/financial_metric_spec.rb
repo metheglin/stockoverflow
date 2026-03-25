@@ -1015,6 +1015,169 @@ RSpec.describe FinancialMetric do
     end
   end
 
+  describe ".get_payout_ratio" do
+    it "配当性向を算出する" do
+      # DPS 50, EPS 200 → 25%
+      expect(FinancialMetric.get_payout_ratio(50, 200)).to eq(25.0)
+    end
+
+    it "100%超の配当性向を記録する（タコ足配当）" do
+      # DPS 150, EPS 100 → 150%
+      expect(FinancialMetric.get_payout_ratio(150, 100)).to eq(150.0)
+    end
+
+    it "EPSがマイナスの場合はnilを返す" do
+      expect(FinancialMetric.get_payout_ratio(50, -100)).to be_nil
+    end
+
+    it "EPSがゼロの場合はnilを返す" do
+      expect(FinancialMetric.get_payout_ratio(50, 0)).to be_nil
+    end
+
+    it "DPSがnilの場合はnilを返す" do
+      expect(FinancialMetric.get_payout_ratio(nil, 200)).to be_nil
+    end
+
+    it "EPSがnilの場合はnilを返す" do
+      expect(FinancialMetric.get_payout_ratio(50, nil)).to be_nil
+    end
+  end
+
+  describe ".get_consecutive_dividend_growth" do
+    it "増配の場合は前期のカウントを引き継いで加算する" do
+      prior_metric = FinancialMetric.new
+      prior_metric.data_json = { "consecutive_dividend_growth" => 3 }
+
+      result = FinancialMetric.get_consecutive_dividend_growth(60, 50, prior_metric)
+      expect(result).to eq(4)
+    end
+
+    it "減配の場合は0にリセットする" do
+      prior_metric = FinancialMetric.new
+      prior_metric.data_json = { "consecutive_dividend_growth" => 5 }
+
+      result = FinancialMetric.get_consecutive_dividend_growth(40, 50, prior_metric)
+      expect(result).to eq(0)
+    end
+
+    it "配当据え置き（同額）の場合は0にリセットする" do
+      prior_metric = FinancialMetric.new
+      prior_metric.data_json = { "consecutive_dividend_growth" => 2 }
+
+      result = FinancialMetric.get_consecutive_dividend_growth(50, 50, prior_metric)
+      expect(result).to eq(0)
+    end
+
+    it "無配から有配への転換は増配開始（1）とする" do
+      prior_metric = FinancialMetric.new
+      prior_metric.data_json = { "consecutive_dividend_growth" => 0 }
+
+      result = FinancialMetric.get_consecutive_dividend_growth(30, 0, prior_metric)
+      expect(result).to eq(1)
+    end
+
+    it "前期メトリクスがnilの場合は初回増配（1）とする" do
+      result = FinancialMetric.get_consecutive_dividend_growth(60, 50, nil)
+      expect(result).to eq(1)
+    end
+
+    it "当期DPSがnilの場合はnilを返す" do
+      expect(FinancialMetric.get_consecutive_dividend_growth(nil, 50, nil)).to be_nil
+    end
+
+    it "前期DPSがnilの場合はnilを返す" do
+      expect(FinancialMetric.get_consecutive_dividend_growth(60, nil, nil)).to be_nil
+    end
+  end
+
+  describe ".get_dividend_metrics" do
+    it "正常ケース（DPS増加、EPSプラス）で全指標を算出する" do
+      current_fv = FinancialValue.new(eps: BigDecimal("200"))
+      allow(current_fv).to receive(:dividend_per_share_annual).and_return(BigDecimal("60"))
+
+      prior_fv = FinancialValue.new
+      allow(prior_fv).to receive(:dividend_per_share_annual).and_return(BigDecimal("50"))
+
+      prior_metric = FinancialMetric.new
+      prior_metric.data_json = { "consecutive_dividend_growth" => 2 }
+
+      result = FinancialMetric.get_dividend_metrics(current_fv, prior_fv, prior_metric)
+
+      expect(result["payout_ratio"]).to eq(30.0)
+      expect(result["dividend_growth_rate"]).to eq(0.2)
+      expect(result["consecutive_dividend_growth"]).to eq(3)
+    end
+
+    it "EPSマイナス時に配当性向がnilとなり結果から除外される" do
+      current_fv = FinancialValue.new(eps: BigDecimal("-50"))
+      allow(current_fv).to receive(:dividend_per_share_annual).and_return(BigDecimal("30"))
+
+      prior_fv = FinancialValue.new
+      allow(prior_fv).to receive(:dividend_per_share_annual).and_return(BigDecimal("25"))
+
+      result = FinancialMetric.get_dividend_metrics(current_fv, prior_fv, nil)
+
+      expect(result).not_to have_key("payout_ratio")
+      expect(result["dividend_growth_rate"]).to eq(0.2)
+      expect(result["consecutive_dividend_growth"]).to eq(1)
+    end
+
+    it "配当性向100%超（タコ足配当）を記録する" do
+      current_fv = FinancialValue.new(eps: BigDecimal("30"))
+      allow(current_fv).to receive(:dividend_per_share_annual).and_return(BigDecimal("50"))
+
+      prior_fv = FinancialValue.new
+      allow(prior_fv).to receive(:dividend_per_share_annual).and_return(BigDecimal("40"))
+
+      result = FinancialMetric.get_dividend_metrics(current_fv, prior_fv, nil)
+
+      expect(result["payout_ratio"]).to be_within(0.01).of(166.67)
+    end
+
+    it "無配から有配への転換で連続増配が1になる" do
+      current_fv = FinancialValue.new(eps: BigDecimal("100"))
+      allow(current_fv).to receive(:dividend_per_share_annual).and_return(BigDecimal("20"))
+
+      prior_fv = FinancialValue.new
+      allow(prior_fv).to receive(:dividend_per_share_annual).and_return(BigDecimal("0"))
+
+      prior_metric = FinancialMetric.new
+      prior_metric.data_json = { "consecutive_dividend_growth" => 0 }
+
+      result = FinancialMetric.get_dividend_metrics(current_fv, prior_fv, prior_metric)
+
+      expect(result["payout_ratio"]).to eq(20.0)
+      expect(result["consecutive_dividend_growth"]).to eq(1)
+    end
+
+    it "前年データ欠損時は成長率・連続増配がnilとなり除外される" do
+      current_fv = FinancialValue.new(eps: BigDecimal("100"))
+      allow(current_fv).to receive(:dividend_per_share_annual).and_return(BigDecimal("30"))
+
+      result = FinancialMetric.get_dividend_metrics(current_fv, nil, nil)
+
+      expect(result["payout_ratio"]).to eq(30.0)
+      expect(result).not_to have_key("dividend_growth_rate")
+      expect(result).not_to have_key("consecutive_dividend_growth")
+    end
+
+    it "連続増配カウントのリセット（減配時）" do
+      current_fv = FinancialValue.new(eps: BigDecimal("100"))
+      allow(current_fv).to receive(:dividend_per_share_annual).and_return(BigDecimal("30"))
+
+      prior_fv = FinancialValue.new
+      allow(prior_fv).to receive(:dividend_per_share_annual).and_return(BigDecimal("40"))
+
+      prior_metric = FinancialMetric.new
+      prior_metric.data_json = { "consecutive_dividend_growth" => 5 }
+
+      result = FinancialMetric.get_dividend_metrics(current_fv, prior_fv, prior_metric)
+
+      expect(result["consecutive_dividend_growth"]).to eq(0)
+      expect(result["dividend_growth_rate"]).to eq(-0.25)
+    end
+  end
+
   describe ".compute_weighted_scores" do
     it "全指標が同値の場合は全て同じスコアになる" do
       metrics = [
