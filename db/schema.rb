@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_03_24_060238) do
+ActiveRecord::Schema[8.1].define(version: 2026_03_25_065540) do
   create_table "application_properties", force: :cascade do |t|
     t.datetime "created_at", null: false
     t.json "data_json", default: "{}", null: false
@@ -85,11 +85,15 @@ ActiveRecord::Schema[8.1].define(version: 2026_03_24_060238) do
     t.integer "scope", default: 0, null: false
     t.datetime "updated_at", null: false
     t.index ["company_id", "fiscal_year_end", "scope", "period_type"], name: "idx_fin_metrics_unique", unique: true
+    t.index ["company_id", "scope", "period_type", "fiscal_year_end"], name: "idx_financial_metrics_timeline"
     t.index ["company_id"], name: "index_financial_metrics_on_company_id"
     t.index ["consecutive_profit_growth"], name: "index_financial_metrics_on_consecutive_profit_growth"
     t.index ["consecutive_revenue_growth"], name: "index_financial_metrics_on_consecutive_revenue_growth"
     t.index ["financial_value_id"], name: "index_financial_metrics_on_financial_value_id"
     t.index ["fiscal_year_end"], name: "index_financial_metrics_on_fiscal_year_end"
+    t.index ["scope", "period_type", "consecutive_profit_growth"], name: "idx_financial_metrics_screening_profit"
+    t.index ["scope", "period_type", "consecutive_revenue_growth", "revenue_yoy"], name: "idx_financial_metrics_screening_revenue"
+    t.index ["scope", "period_type", "operating_cf_positive", "investing_cf_negative"], name: "idx_financial_metrics_cashflow"
   end
 
   create_table "financial_reports", force: :cascade do |t|
@@ -140,6 +144,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_03_24_060238) do
     t.bigint "treasury_shares"
     t.datetime "updated_at", null: false
     t.index ["company_id", "fiscal_year_end", "scope", "period_type"], name: "idx_fin_values_unique", unique: true
+    t.index ["company_id", "scope", "period_type", "fiscal_year_end"], name: "idx_financial_values_timeline"
     t.index ["company_id"], name: "index_financial_values_on_company_id"
     t.index ["financial_report_id"], name: "index_financial_values_on_financial_report_id"
     t.index ["fiscal_year_end"], name: "index_financial_values_on_fiscal_year_end"
