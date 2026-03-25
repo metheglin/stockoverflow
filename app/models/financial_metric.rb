@@ -38,6 +38,20 @@ class FinancialMetric < ApplicationRecord
     standalone_quarter_revenue_yoy: { type: :decimal },
     standalone_quarter_operating_income_yoy: { type: :decimal },
     standalone_quarter_net_income_yoy: { type: :decimal },
+    # CAGR（年平均成長率）
+    revenue_cagr_3y: { type: :decimal },
+    revenue_cagr_5y: { type: :decimal },
+    operating_income_cagr_3y: { type: :decimal },
+    operating_income_cagr_5y: { type: :decimal },
+    net_income_cagr_3y: { type: :decimal },
+    net_income_cagr_5y: { type: :decimal },
+    eps_cagr_3y: { type: :decimal },
+    eps_cagr_5y: { type: :decimal },
+    # CAGR加速度
+    cagr_acceleration_revenue: { type: :decimal },
+    cagr_acceleration_operating_income: { type: :decimal },
+    cagr_acceleration_net_income: { type: :decimal },
+    cagr_acceleration_eps: { type: :decimal },
     # 配当分析
     payout_ratio: { type: :decimal },
     dividend_growth_rate: { type: :decimal },
@@ -223,6 +237,115 @@ class FinancialMetric < ApplicationRecord
       prev_count + 1
     else
       0
+    end
+  end
+
+  # CAGR計算対象の指標定義
+  # key: data_jsonに格納するときのprefix, value: FinancialValueの属性名
+  CAGR_TARGETS = {
+    revenue: :net_sales,
+    operating_income: :operating_income,
+    net_income: :net_income,
+    eps: :eps,
+  }.freeze
+
+  # CAGR計算対象の年数
+  CAGR_PERIODS = [3, 5].freeze
+
+  # CAGR（年平均成長率）を算出する
+  #
+  # CAGR = (終了値 / 開始値)^(1/年数) - 1
+  # 開始値が0以下の場合はnilを返す（対数計算不可）
+  #
+  # @param end_value [Numeric, nil] 終了時点の値
+  # @param start_value [Numeric, nil] 開始時点の値
+  # @param years [Integer] 年数
+  # @return [Float, nil] CAGR（小数表現）
+  def self.compute_cagr(end_value, start_value, years)
+    return nil if end_value.nil? || start_value.nil?
+    return nil if start_value.to_d <= 0
+    return nil if years <= 0
+
+    ratio = end_value.to_d / start_value.to_d
+    return nil if ratio < 0
+
+    (ratio.to_f ** (1.0 / years) - 1.0).round(4)
+  end
+
+  # 複数年のCAGRメトリクスを一括算出する
+  #
+  # @param current_fv [FinancialValue] 当期の財務数値
+  # @param historical_fvs [Array<FinancialValue>] 過去のFinancialValueの配列（fiscal_year_end降順）
+  #   同一company_id・同一scope・同一period_typeであること
+  # @return [Hash] CAGRメトリクスのHash（data_json格納用）
+  #
+  # 例:
+  #   result = FinancialMetric.get_cagr_metrics(current_fv, historical_fvs)
+  #   # => { "revenue_cagr_3y" => 0.15, "revenue_cagr_5y" => 0.12, ... }
+  #
+  def self.get_cagr_metrics(current_fv, historical_fvs)
+    return {} if historical_fvs.blank?
+
+    # fiscal_year_endの降順ソート済みを前提に、年数差を計算
+    result = {}
+
+    CAGR_TARGETS.each do |prefix, attr|
+      end_value = current_fv.public_send(attr)
+      next if end_value.nil?
+
+      CAGR_PERIODS.each do |period|
+        start_fv = find_fv_for_period(current_fv, historical_fvs, period)
+        next unless start_fv
+
+        start_value = start_fv.public_send(attr)
+        cagr = compute_cagr(end_value, start_value, period)
+        result["#{prefix}_cagr_#{period}y"] = cagr unless cagr.nil?
+      end
+    end
+
+    result
+  end
+
+  # CAGR加速度を算出する
+  #
+  # 直近3年CAGRと、3年前時点での3年CAGRを比較して加速度を算出する。
+  # cagr_acceleration = current_3y_cagr - prior_3y_cagr
+  #
+  # @param current_cagr_metrics [Hash] 当期のCAGRメトリクス（get_cagr_metricsの結果）
+  # @param prior_metric [FinancialMetric, nil] 3年前のFinancialMetric
+  # @return [Hash] CAGR加速度のHash（data_json格納用）
+  #
+  # 例:
+  #   result = FinancialMetric.get_cagr_acceleration(cagr_metrics, prior_metric)
+  #   # => { "cagr_acceleration_revenue" => 0.05, ... }
+  #
+  def self.get_cagr_acceleration(current_cagr_metrics, prior_metric)
+    return {} unless prior_metric
+
+    result = {}
+
+    CAGR_TARGETS.each_key do |prefix|
+      current_cagr = current_cagr_metrics["#{prefix}_cagr_3y"]
+      prior_cagr = prior_metric.public_send(:"#{prefix}_cagr_3y")
+      next if current_cagr.nil? || prior_cagr.nil?
+
+      result["cagr_acceleration_#{prefix}"] = (current_cagr - prior_cagr.to_f).round(4)
+    end
+
+    result
+  end
+
+  # historical_fvsからN年前のFinancialValueを検索する
+  #
+  # @param current_fv [FinancialValue] 基準となる当期のFinancialValue
+  # @param historical_fvs [Array<FinancialValue>] 過去のFinancialValueの配列
+  # @param years [Integer] 遡る年数
+  # @return [FinancialValue, nil]
+  def self.find_fv_for_period(current_fv, historical_fvs, years)
+    target_date = current_fv.fiscal_year_end - years.years
+
+    historical_fvs.find do |fv|
+      (fv.fiscal_year_end - target_date).abs <= 45
     end
   end
 

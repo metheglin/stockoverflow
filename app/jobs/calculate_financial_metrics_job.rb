@@ -53,6 +53,12 @@ class CalculateFinancialMetricsJob < ApplicationJob
     efficiency = FinancialMetric.get_efficiency_metrics(fv)
     dividend = FinancialMetric.get_dividend_metrics(fv, previous_fv, previous_metric)
 
+    historical_fvs = find_historical_financial_values(fv)
+    cagr = FinancialMetric.get_cagr_metrics(fv, historical_fvs)
+
+    prior_metric_3y = find_metric_n_years_ago(fv, 3)
+    cagr_acceleration = FinancialMetric.get_cagr_acceleration(cagr, prior_metric_3y)
+
     quarterly_yoy = {}
     unless fv.annual?
       current_prev_quarter_fv = find_previous_quarter_financial_value(fv)
@@ -79,7 +85,7 @@ class CalculateFinancialMetricsJob < ApplicationJob
       **consecutive,
     )
 
-    json_updates = {}.merge(valuation).merge(ev_ebitda).merge(surprise).merge(financial_health).merge(efficiency).merge(dividend).merge(quarterly_yoy)
+    json_updates = {}.merge(valuation).merge(ev_ebitda).merge(surprise).merge(financial_health).merge(efficiency).merge(dividend).merge(cagr).merge(cagr_acceleration).merge(quarterly_yoy)
     if json_updates.any?
       metric.data_json = (metric.data_json || {}).merge(json_updates)
     end
@@ -92,6 +98,36 @@ class CalculateFinancialMetricsJob < ApplicationJob
       "[CalculateFinancialMetricsJob] Failed for FV##{fv.id} " \
       "(company=#{fv.company_id}, fy=#{fv.fiscal_year_end}): #{e.message}"
     )
+  end
+
+  # 過去のFinancialValueを最大5年分検索（CAGR計算用）
+  def find_historical_financial_values(fv)
+    FinancialValue
+      .where(
+        company_id: fv.company_id,
+        scope: fv.scope,
+        period_type: fv.period_type,
+      )
+      .where("fiscal_year_end < ?", fv.fiscal_year_end)
+      .order(fiscal_year_end: :desc)
+      .limit(5)
+      .to_a
+  end
+
+  # N年前のFinancialMetricを検索
+  def find_metric_n_years_ago(fv, years)
+    target_date = fv.fiscal_year_end - years.years
+    margin = 45.days
+
+    FinancialMetric
+      .where(
+        company_id: fv.company_id,
+        scope: fv.scope,
+        period_type: fv.period_type,
+      )
+      .where(fiscal_year_end: (target_date - margin)..(target_date + margin))
+      .order(Arel.sql("ABS(JULIANDAY(fiscal_year_end) - JULIANDAY('#{target_date}'))"))
+      .first
   end
 
   # 前期の FinancialValue を検索
