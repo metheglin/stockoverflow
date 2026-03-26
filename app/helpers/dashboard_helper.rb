@@ -127,6 +127,63 @@ module DashboardHelper
     end
   end
 
+  # 金額を読みやすい形式にフォーマット
+  #
+  # 100_000_000 => "1.00億"
+  # 1_000_000_000_000 => "1.00兆"
+  def format_amount(value)
+    return "-" if value.nil?
+    if value.to_f.abs >= 1_000_000_000_000
+      "#{(value.to_f / 1_000_000_000_000).round(2)}兆"
+    elsif value.to_f.abs >= 100_000_000
+      "#{(value.to_f / 100_000_000).round(2)}億"
+    elsif value.to_f.abs >= 10_000
+      "#{(value.to_f / 10_000).round(1)}万"
+    else
+      number_with_delimiter(value.to_i)
+    end
+  end
+
+  # パーセント表示（企業詳細用）
+  def format_detail_percent(value)
+    return "-" if value.nil?
+    "#{(value.to_f * 100).round(1)}%"
+  end
+
+  # 倍率表示（企業詳細用）
+  def format_detail_ratio(value)
+    return "-" if value.nil?
+    "#{value.to_f.round(2)}x"
+  end
+
+  # YoY表示（符号付き）
+  def format_yoy(value)
+    return "-" if value.nil?
+    pct = (value.to_f * 100).round(1)
+    pct >= 0 ? "+#{pct}% YoY" : "#{pct}% YoY"
+  end
+
+  # テーブル内の値フォーマット
+  def format_table_value(value, format_type)
+    return "-" if value.nil?
+    case format_type
+    when :amount
+      format_amount(value)
+    when :percent, :yoy
+      format_detail_percent(value)
+    when :ratio
+      format_detail_ratio(value)
+    when :number
+      if value.is_a?(Integer) || value.to_f == value.to_i.to_f
+        number_with_delimiter(value.to_i)
+      else
+        value.to_f.round(2).to_s
+      end
+    else
+      value.to_s
+    end
+  end
+
   private
 
   def format_as_percent(value)

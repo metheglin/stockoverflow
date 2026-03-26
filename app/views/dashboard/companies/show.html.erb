@@ -1,8 +1,80 @@
 <div class="page-header">
-  <h1 class="page-title">Company Detail</h1>
-  <p class="page-subtitle">Detailed financial overview</p>
+  <div class="page-header__nav">
+    <%= link_to "← 戻る", dashboard_companies_path, class: "btn btn-sm" %>
+  </div>
+  <h1 class="page-title">
+    <span class="company-code"><%= @company.securities_code %></span>
+    <%= @company.name %>
+    <% if @company.name_english.present? %>
+      <span class="company-name-en">(<%= @company.name_english %>)</span>
+    <% end %>
+  </h1>
+  <p class="page-subtitle">
+    <%= @company.sector_33_name %>
+    <% if @company.market_name.present? %>
+      | <%= @company.market_name %>
+    <% end %>
+    <% if @company.scale_category.present? %>
+      | <%= @company.scale_category %>
+    <% end %>
+  </p>
 </div>
 
-<div class="section-card">
-  <p class="text-secondary">Company detail will be implemented in Phase 2.</p>
+<%# Scope/Period selector %>
+<div class="section-card scope-selector">
+  <form class="scope-selector__form" method="get" action="<%= dashboard_company_path(@company) %>">
+    <div class="scope-selector__group">
+      <label class="form-label-inline">スコープ:</label>
+      <select name="scope_type" class="form-select form-select-sm" onchange="this.form.submit()">
+        <option value="consolidated" <%= "selected" if @summary.scope_type == :consolidated %>>連結</option>
+        <option value="non_consolidated" <%= "selected" if @summary.scope_type == :non_consolidated %>>個別</option>
+      </select>
+    </div>
+    <div class="scope-selector__group">
+      <label class="form-label-inline">期間:</label>
+      <select name="period_type" class="form-select form-select-sm" onchange="this.form.submit()">
+        <option value="annual" <%= "selected" if @summary.period_type == :annual %>>通期</option>
+        <option value="q1" <%= "selected" if @summary.period_type == :q1 %>>Q1</option>
+        <option value="q2" <%= "selected" if @summary.period_type == :q2 %>>Q2</option>
+        <option value="q3" <%= "selected" if @summary.period_type == :q3 %>>Q3</option>
+      </select>
+    </div>
+  </form>
+</div>
+
+<%# Summary cards %>
+<%= render "dashboard/companies/summary_cards", summary: @summary %>
+
+<%# Tabs %>
+<div class="section-card" data-controller="tabs">
+  <div class="tabs">
+    <button class="tabs__tab" data-tabs-target="tab" data-tab="financials" data-action="click->tabs#select">財務データ</button>
+    <button class="tabs__tab" data-tabs-target="tab" data-tab="metrics" data-action="click->tabs#select">指標推移</button>
+    <button class="tabs__tab" data-tabs-target="tab" data-tab="quotes" data-action="click->tabs#select">株価</button>
+    <button class="tabs__tab" data-tabs-target="tab" data-tab="compare" data-action="click->tabs#select">比較</button>
+  </div>
+
+  <div class="tabs__panel" data-tabs-target="panel" data-tab="financials">
+    <turbo-frame id="tab_financials" loading="lazy" data-src="<%= financials_dashboard_company_path(@company, scope_type: @summary.scope_type, period_type: @summary.period_type) %>">
+      <div class="tabs__loading">読み込み中...</div>
+    </turbo-frame>
+  </div>
+
+  <div class="tabs__panel" data-tabs-target="panel" data-tab="metrics">
+    <turbo-frame id="tab_metrics" loading="lazy" data-src="<%= metrics_dashboard_company_path(@company, scope_type: @summary.scope_type, period_type: @summary.period_type) %>">
+      <div class="tabs__loading">読み込み中...</div>
+    </turbo-frame>
+  </div>
+
+  <div class="tabs__panel" data-tabs-target="panel" data-tab="quotes">
+    <turbo-frame id="tab_quotes" loading="lazy" data-src="<%= quotes_dashboard_company_path(@company, scope_type: @summary.scope_type, period_type: @summary.period_type) %>">
+      <div class="tabs__loading">読み込み中...</div>
+    </turbo-frame>
+  </div>
+
+  <div class="tabs__panel" data-tabs-target="panel" data-tab="compare">
+    <turbo-frame id="tab_compare" loading="lazy" data-src="<%= compare_dashboard_company_path(@company, scope_type: @summary.scope_type, period_type: @summary.period_type) %>">
+      <div class="tabs__loading">読み込み中...</div>
+    </turbo-frame>
+  </div>
 </div>

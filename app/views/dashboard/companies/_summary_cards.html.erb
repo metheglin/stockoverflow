@@ -1,0 +1,69 @@
+<% fv = summary.latest_financial_value %>
+<% fm = summary.latest_financial_metric %>
+
+<div class="metric-grid">
+  <%# Revenue / Profit cards %>
+  <div class="metric-card">
+    <div class="metric-card-label">売上高</div>
+    <div class="metric-card-value"><%= format_amount(fv&.net_sales) %></div>
+    <% if fm %>
+      <div class="metric-card-change <%= value_color_class(fm.revenue_yoy) %>">
+        <%= format_yoy(fm.revenue_yoy) %>
+      </div>
+    <% end %>
+  </div>
+
+  <div class="metric-card">
+    <div class="metric-card-label">営業利益</div>
+    <div class="metric-card-value"><%= format_amount(fv&.operating_income) %></div>
+    <% if fm %>
+      <div class="metric-card-change <%= value_color_class(fm.operating_income_yoy) %>">
+        <%= format_yoy(fm.operating_income_yoy) %>
+      </div>
+    <% end %>
+  </div>
+
+  <div class="metric-card">
+    <div class="metric-card-label">純利益</div>
+    <div class="metric-card-value"><%= format_amount(fv&.net_income) %></div>
+    <% if fm %>
+      <div class="metric-card-change <%= value_color_class(fm.net_income_yoy) %>">
+        <%= format_yoy(fm.net_income_yoy) %>
+      </div>
+    <% end %>
+  </div>
+
+  <%# Profitability / Valuation cards %>
+  <div class="metric-card">
+    <div class="metric-card-label">ROE</div>
+    <div class="metric-card-value"><%= format_detail_percent(fm&.roe) %></div>
+  </div>
+
+  <div class="metric-card">
+    <div class="metric-card-label">PER</div>
+    <div class="metric-card-value"><%= format_detail_ratio(fm&.per) %></div>
+  </div>
+
+  <div class="metric-card">
+    <div class="metric-card-label">配当利回り</div>
+    <div class="metric-card-value"><%= format_detail_percent(fm&.dividend_yield) %></div>
+  </div>
+
+  <%# Score cards %>
+  <% if fm %>
+    <div class="metric-card">
+      <div class="metric-card-label">総合スコア</div>
+      <div class="metric-card-value"><%= fm.composite_score&.round(1) || "-" %></div>
+    </div>
+
+    <div class="metric-card">
+      <div class="metric-card-label">成長スコア</div>
+      <div class="metric-card-value"><%= fm.growth_score&.round(1) || "-" %></div>
+    </div>
+
+    <div class="metric-card">
+      <div class="metric-card-label">品質スコア</div>
+      <div class="metric-card-value"><%= fm.quality_score&.round(1) || "-" %></div>
+    </div>
+  <% end %>
+</div>

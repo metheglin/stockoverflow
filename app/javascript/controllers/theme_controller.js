@@ -21,6 +21,7 @@ export default class extends Controller {
       localStorage.setItem("theme", "light")
     }
     this.updateIcon()
+    document.dispatchEvent(new CustomEvent("theme:changed"))
   }
 
   updateIcon() {

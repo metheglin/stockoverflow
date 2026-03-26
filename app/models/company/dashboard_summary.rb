@@ -3,12 +3,21 @@ class Company::DashboardSummary
     revenue_profit growth_rates profitability cashflow valuation per_share stock_price
   ].freeze
 
-  attr_reader :company, :scope_type, :period_type
+  QUOTE_PERIODS = {
+    "1m" => 1.month,
+    "3m" => 3.months,
+    "6m" => 6.months,
+    "1y" => 1.year,
+    "3y" => 3.years,
+  }.freeze
 
-  def initialize(company:, scope_type: :consolidated, period_type: :annual)
+  attr_reader :company, :scope_type, :period_type, :quote_period
+
+  def initialize(company:, scope_type: :consolidated, period_type: :annual, quote_period: nil)
     @company = company
     @scope_type = scope_type
     @period_type = period_type
+    @quote_period = quote_period
   end
 
   # 最新のFinancialValue
@@ -105,9 +114,14 @@ class Company::DashboardSummary
   end
 
   def load_recent_quotes
-    @company.daily_quotes
-      .where("traded_on >= ?", 1.year.ago.to_date)
-      .order(traded_on: :asc)
+    duration = QUOTE_PERIODS[@quote_period.to_s] || 1.year
+    if @quote_period.to_s == "all"
+      @company.daily_quotes.order(traded_on: :asc)
+    else
+      @company.daily_quotes
+        .where("traded_on >= ?", duration.ago.to_date)
+        .order(traded_on: :asc)
+    end
   end
 
   def load_sector_stats

@@ -151,6 +151,96 @@ RSpec.describe DashboardHelper do
     end
   end
 
+  describe "#format_amount" do
+    it "nilの場合'-'を返す" do
+      expect(helper.format_amount(nil)).to eq("-")
+    end
+
+    it "兆単位にフォーマットする" do
+      expect(helper.format_amount(1_500_000_000_000)).to eq("1.5兆")
+    end
+
+    it "億単位にフォーマットする" do
+      expect(helper.format_amount(350_000_000)).to eq("3.5億")
+    end
+
+    it "万単位にフォーマットする" do
+      expect(helper.format_amount(50_000)).to eq("5.0万")
+    end
+
+    it "小さい数値はそのまま表示する" do
+      expect(helper.format_amount(1234)).to eq("1,234")
+    end
+
+    it "負の兆単位にフォーマットする" do
+      expect(helper.format_amount(-2_000_000_000_000)).to eq("-2.0兆")
+    end
+  end
+
+  describe "#format_detail_percent" do
+    it "nilの場合'-'を返す" do
+      expect(helper.format_detail_percent(nil)).to eq("-")
+    end
+
+    it "小数をパーセント表示に変換する" do
+      expect(helper.format_detail_percent(0.123)).to eq("12.3%")
+    end
+
+    it "負の値もパーセント表示に変換する" do
+      expect(helper.format_detail_percent(-0.05)).to eq("-5.0%")
+    end
+  end
+
+  describe "#format_detail_ratio" do
+    it "nilの場合'-'を返す" do
+      expect(helper.format_detail_ratio(nil)).to eq("-")
+    end
+
+    it "倍率表示に変換する" do
+      expect(helper.format_detail_ratio(15.678)).to eq("15.68x")
+    end
+  end
+
+  describe "#format_yoy" do
+    it "nilの場合'-'を返す" do
+      expect(helper.format_yoy(nil)).to eq("-")
+    end
+
+    it "正のYoYを+付きで表示する" do
+      expect(helper.format_yoy(0.152)).to eq("+15.2% YoY")
+    end
+
+    it "負のYoYをマイナス付きで表示する" do
+      expect(helper.format_yoy(-0.08)).to eq("-8.0% YoY")
+    end
+  end
+
+  describe "#format_table_value" do
+    it "nilの場合'-'を返す" do
+      expect(helper.format_table_value(nil, :amount)).to eq("-")
+    end
+
+    it "amount形式でフォーマットする" do
+      expect(helper.format_table_value(500_000_000, :amount)).to eq("5.0億")
+    end
+
+    it "percent形式でフォーマットする" do
+      expect(helper.format_table_value(0.15, :percent)).to eq("15.0%")
+    end
+
+    it "ratio形式でフォーマットする" do
+      expect(helper.format_table_value(12.5, :ratio)).to eq("12.5x")
+    end
+
+    it "number形式で整数をフォーマットする" do
+      expect(helper.format_table_value(1500, :number)).to eq("1,500")
+    end
+
+    it "number形式で小数をフォーマットする" do
+      expect(helper.format_table_value(12.345, :number)).to eq("12.35")
+    end
+  end
+
   describe "#get_result_value" do
     let(:company) { Company.new(securities_code: "7203", name: "トヨタ自動車", sector_33_name: "輸送用機器") }
     let(:metric) { FinancialMetric.new(roe: 0.123, revenue_yoy: 0.15) }

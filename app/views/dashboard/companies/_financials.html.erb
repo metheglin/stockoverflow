@@ -1,0 +1,21 @@
+<turbo-frame id="tab_financials">
+  <%# Revenue & Profit chart + table %>
+  <%= render "dashboard/companies/chart_section",
+             title: "売上・利益推移",
+             chart_url: chart_data_dashboard_company_path(@company, chart_type: :revenue_profit, scope_type: @summary.scope_type, period_type: @summary.period_type),
+             chart_type: "bar",
+             timeline: @summary.timeline,
+             columns: [:net_sales, :operating_income, :net_income],
+             column_labels: { net_sales: "売上高", operating_income: "営業利益", net_income: "純利益" },
+             format_type: :amount %>
+
+  <%# Cashflow chart + table %>
+  <%= render "dashboard/companies/chart_section",
+             title: "キャッシュフロー推移",
+             chart_url: chart_data_dashboard_company_path(@company, chart_type: :cashflow, scope_type: @summary.scope_type, period_type: @summary.period_type),
+             chart_type: "bar",
+             timeline: @summary.timeline,
+             columns: [:operating_cf, :investing_cf, :financing_cf, :free_cf],
+             column_labels: { operating_cf: "営業CF", investing_cf: "投資CF", financing_cf: "財務CF", free_cf: "フリーCF" },
+             format_type: :amount %>
+</turbo-frame>

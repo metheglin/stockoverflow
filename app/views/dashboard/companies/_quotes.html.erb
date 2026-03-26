@@ -1,0 +1,25 @@
+<turbo-frame id="tab_quotes">
+  <div class="chart-section">
+    <h3 class="chart-section__title">株価チャート</h3>
+
+    <div class="period-selector"
+         data-controller="period-selector"
+         data-period-selector-base-url-value="<%= chart_data_dashboard_company_path(@company, chart_type: :stock_price, scope_type: @summary.scope_type, period_type: @summary.period_type) %>"
+         data-period-selector-chart-outlet="#stock-chart">
+      <button class="btn btn-sm period-selector__btn" data-period-selector-target="button" data-period="1m" data-action="click->period-selector#select">1M</button>
+      <button class="btn btn-sm period-selector__btn" data-period-selector-target="button" data-period="3m" data-action="click->period-selector#select">3M</button>
+      <button class="btn btn-sm period-selector__btn" data-period-selector-target="button" data-period="6m" data-action="click->period-selector#select">6M</button>
+      <button class="btn btn-sm period-selector__btn active" data-period-selector-target="button" data-period="1y" data-action="click->period-selector#select">1Y</button>
+      <button class="btn btn-sm period-selector__btn" data-period-selector-target="button" data-period="3y" data-action="click->period-selector#select">3Y</button>
+      <button class="btn btn-sm period-selector__btn" data-period-selector-target="button" data-period="all" data-action="click->period-selector#select">ALL</button>
+    </div>
+
+    <div class="chart-section__chart chart-section__chart--full"
+         id="stock-chart"
+         data-controller="chart"
+         data-chart-url-value="<%= chart_data_dashboard_company_path(@company, chart_type: :stock_price, scope_type: @summary.scope_type, period_type: @summary.period_type) %>"
+         data-chart-type-value="line">
+      <canvas></canvas>
+    </div>
+  </div>
+</turbo-frame>

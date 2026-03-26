@@ -1,0 +1,19 @@
+<%# locals: (title:, chart_url:, chart_type: "bar", timeline:, columns:, column_labels: {}, format_type: :amount) %>
+<div class="chart-section">
+  <h3 class="chart-section__title"><%= title %></h3>
+  <div class="chart-section__body">
+    <div class="chart-section__chart"
+         data-controller="chart"
+         data-chart-url-value="<%= chart_url %>"
+         data-chart-type-value="<%= chart_type %>">
+      <canvas></canvas>
+    </div>
+    <div class="chart-section__table">
+      <%= render "dashboard/companies/data_table",
+                 timeline: timeline,
+                 columns: columns,
+                 column_labels: column_labels,
+                 format_type: format_type %>
+    </div>
+  </div>
+</div>

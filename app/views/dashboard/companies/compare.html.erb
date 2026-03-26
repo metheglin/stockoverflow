@@ -1,0 +1,46 @@
+<turbo-frame id="tab_compare">
+  <%
+    available_charts = {
+      revenue_profit: "売上・利益推移",
+      growth_rates: "成長率推移",
+      profitability: "収益性指標",
+      cashflow: "キャッシュフロー",
+      valuation: "バリュエーション",
+      per_share: "EPS・BPS",
+      stock_price: "株価",
+    }
+    selected = @chart_types || [:revenue_profit, :growth_rates, :profitability]
+  %>
+
+  <div class="compare-controls">
+    <h3 class="chart-section__title">表示するグラフを選択</h3>
+    <form method="get" action="<%= compare_dashboard_company_path(@company) %>" class="compare-controls__form">
+      <input type="hidden" name="scope_type" value="<%= @summary.scope_type %>">
+      <input type="hidden" name="period_type" value="<%= @summary.period_type %>">
+      <div class="compare-controls__checkboxes">
+        <% available_charts.each do |key, label| %>
+          <label class="compare-controls__label">
+            <input type="checkbox" name="charts[]" value="<%= key %>"
+                   <%= "checked" if selected.include?(key) %>
+                   onchange="this.form.submit()">
+            <%= label %>
+          </label>
+        <% end %>
+      </div>
+    </form>
+  </div>
+
+  <div class="compare-grid">
+    <% selected.each do |chart_type| %>
+      <div class="compare-grid__item">
+        <h4 class="compare-grid__title"><%= available_charts[chart_type] %></h4>
+        <div class="chart-section__chart"
+             data-controller="chart"
+             data-chart-url-value="<%= chart_data_dashboard_company_path(@company, chart_type: chart_type, scope_type: @summary.scope_type, period_type: @summary.period_type) %>"
+             data-chart-type-value="<%= chart_type == :stock_price ? 'line' : 'bar' %>">
+          <canvas></canvas>
+        </div>
+      </div>
+    <% end %>
+  </div>
+</turbo-frame>

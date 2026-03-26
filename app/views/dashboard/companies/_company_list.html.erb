@@ -1,0 +1,33 @@
+<div class="section-card">
+  <div class="table-container">
+    <table class="table">
+      <thead>
+        <tr>
+          <th>証券コード</th>
+          <th>企業名</th>
+          <th>セクター</th>
+          <th>市場</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        <% companies.each do |company| %>
+          <tr class="row-clickable" data-action="click->result-table#navigateToCompany" data-url="<%= dashboard_company_path(company) %>">
+            <td class="cell-numeric"><%= company.securities_code %></td>
+            <td><%= company.name %></td>
+            <td><%= company.sector_33_name %></td>
+            <td><%= company.market_name %></td>
+            <td>
+              <%= link_to "詳細", dashboard_company_path(company), class: "btn btn-sm" %>
+            </td>
+          </tr>
+        <% end %>
+        <% if companies.empty? %>
+          <tr>
+            <td colspan="5" class="text-center text-secondary">該当する企業が見つかりません</td>
+          </tr>
+        <% end %>
+      </tbody>
+    </table>
+  </div>
+</div>

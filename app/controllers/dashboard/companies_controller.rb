@@ -44,14 +44,24 @@ class Dashboard::CompaniesController < Dashboard::BaseController
   def compare
     @company = Company.find(params[:id])
     @summary = Company::DashboardSummary.new(company: @company, scope_type: scope_type_param, period_type: period_type_param)
-    @chart_types = (params[:charts] || "revenue_profit,growth_rates,profitability").split(",").map(&:to_sym)
+    @chart_types = parse_chart_types
   end
 
   # JSON API: グラフデータを返す
   def chart_data
     @company = Company.find(params[:id])
-    summary = Company::DashboardSummary.new(company: @company, scope_type: scope_type_param, period_type: period_type_param)
     chart_type = params[:chart_type]&.to_sym || :revenue_profit
+
+    if chart_type == :stock_price
+      summary = Company::DashboardSummary.new(
+        company: @company,
+        scope_type: scope_type_param,
+        period_type: period_type_param,
+        quote_period: params[:period]
+      )
+    else
+      summary = Company::DashboardSummary.new(company: @company, scope_type: scope_type_param, period_type: period_type_param)
+    end
 
     render json: summary.get_chart_data(chart_type)
   end
@@ -64,5 +74,15 @@ class Dashboard::CompaniesController < Dashboard::BaseController
 
   def period_type_param
     params[:period_type]&.to_sym || :annual
+  end
+
+  def parse_chart_types
+    if params[:charts].is_a?(Array)
+      params[:charts].map(&:to_sym) & Company::DashboardSummary::CHART_TYPES
+    elsif params[:charts].is_a?(String)
+      params[:charts].split(",").map(&:to_sym) & Company::DashboardSummary::CHART_TYPES
+    else
+      [:revenue_profit, :growth_rates, :profitability]
+    end
   end
 end

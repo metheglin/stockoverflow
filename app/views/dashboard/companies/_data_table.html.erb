@@ -1,0 +1,30 @@
+<%# locals: (timeline:, columns:, column_labels: {}, format_type: :amount) %>
+<div class="table-container">
+  <table class="table table-compact data-table">
+    <thead>
+      <tr>
+        <th>FY</th>
+        <% columns.each do |col| %>
+          <th class="cell-numeric"><%= column_labels[col] || column_label(col) %></th>
+        <% end %>
+      </tr>
+    </thead>
+    <tbody>
+      <% timeline.reverse_each do |t| %>
+        <tr>
+          <td><%= t[:fiscal_year_end]&.strftime("%Y/%m") %></td>
+          <% columns.each do |col| %>
+            <%
+              value = col.to_s.start_with?("operating_cf", "investing_cf", "financing_cf", "free_cf", "net_sales", "operating_income", "ordinary_income", "net_income", "total_assets", "net_assets", "cash_and_equivalents") ?
+                t[:values][col] || t[:metrics][col] :
+                t[:metrics][col] || t[:values][col]
+            %>
+            <td class="cell-numeric <%= value_color_class(value) if format_type == :percent || format_type == :yoy %>">
+              <%= format_table_value(value, format_type) %>
+            </td>
+          <% end %>
+        </tr>
+      <% end %>
+    </tbody>
+  </table>
+</div>

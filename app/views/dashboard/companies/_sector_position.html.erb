@@ -1,0 +1,35 @@
+<%# locals: (label:, value:, position_data:, sector_median:, format_type: :percent) %>
+<%
+  # quartile (1-4) をパーセンタイルに変換: Q1=12.5%, Q2=37.5%, Q3=62.5%, Q4=87.5%
+  quartile = position_data.is_a?(Hash) ? position_data[:quartile] : 2
+  percentile_value = case quartile
+                     when 1 then 12.5
+                     when 2 then 37.5
+                     when 3 then 62.5
+                     when 4 then 87.5
+                     else 50.0
+                     end
+  bar_width = [percentile_value, 100].min
+  median_pct = 50
+  formatted_value = case format_type
+                    when :percent then format_detail_percent(value)
+                    when :ratio then format_detail_ratio(value)
+                    else value&.round(2).to_s || "-"
+                    end
+  formatted_median = case format_type
+                     when :percent then format_detail_percent(sector_median)
+                     when :ratio then format_detail_ratio(sector_median)
+                     else sector_median&.round(2).to_s || "-"
+                     end
+%>
+<div class="sector-position">
+  <div class="sector-position__label"><%= label %></div>
+  <div class="sector-position__bar">
+    <div class="sector-position__fill" style="width: <%= bar_width %>%">
+      <span class="sector-position__value"><%= formatted_value %></span>
+    </div>
+    <div class="sector-position__median-marker" style="left: <%= median_pct %>%"
+         title="セクター中央値: <%= formatted_median %>"></div>
+  </div>
+  <div class="sector-position__percentile">上位<%= (100 - percentile_value).round(0).to_i %>%</div>
+</div>

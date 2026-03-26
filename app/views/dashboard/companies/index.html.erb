@@ -4,8 +4,21 @@
 </div>
 
 <div class="section-card">
-  <div class="card-header">
-    <h2 class="card-title">Company List</h2>
+  <div class="company-search"
+       data-controller="company-search"
+       data-company-search-url-value="<%= dashboard_companies_path %>">
+    <form class="company-search__form" data-action="submit->company-search#submit">
+      <input type="text"
+             class="form-input company-search__input"
+             placeholder="証券コード・企業名で検索..."
+             data-company-search-target="input"
+             data-action="input->company-search#search">
+      <button type="submit" class="btn btn-primary">検索</button>
+      <span class="company-search__loading" data-company-search-target="loading" hidden>検索中...</span>
+    </form>
   </div>
-  <p class="text-secondary">Company list will be implemented in Phase 2.</p>
 </div>
+
+<turbo-frame id="company_list">
+  <%= render "dashboard/companies/company_list", companies: @companies %>
+</turbo-frame>

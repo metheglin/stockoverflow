@@ -1,0 +1,59 @@
+<turbo-frame id="tab_metrics">
+  <%# Growth rates chart + table %>
+  <%= render "dashboard/companies/chart_section",
+             title: "成長率推移",
+             chart_url: chart_data_dashboard_company_path(@company, chart_type: :growth_rates, scope_type: @summary.scope_type, period_type: @summary.period_type),
+             chart_type: "line",
+             timeline: @summary.timeline,
+             columns: [:revenue_yoy, :operating_income_yoy, :net_income_yoy],
+             column_labels: { revenue_yoy: "売上高YoY", operating_income_yoy: "営業利益YoY", net_income_yoy: "純利益YoY" },
+             format_type: :percent %>
+
+  <%# Profitability chart + table %>
+  <%= render "dashboard/companies/chart_section",
+             title: "収益性指標推移",
+             chart_url: chart_data_dashboard_company_path(@company, chart_type: :profitability, scope_type: @summary.scope_type, period_type: @summary.period_type),
+             chart_type: "line",
+             timeline: @summary.timeline,
+             columns: [:roe, :roa, :operating_margin, :net_margin],
+             column_labels: { roe: "ROE", roa: "ROA", operating_margin: "営業利益率", net_margin: "純利益率" },
+             format_type: :percent %>
+
+  <%# Valuation chart + table %>
+  <%= render "dashboard/companies/chart_section",
+             title: "バリュエーション推移",
+             chart_url: chart_data_dashboard_company_path(@company, chart_type: :valuation, scope_type: @summary.scope_type, period_type: @summary.period_type),
+             chart_type: "line",
+             timeline: @summary.timeline,
+             columns: [:per, :pbr],
+             column_labels: { per: "PER", pbr: "PBR" },
+             format_type: :ratio %>
+
+  <%# Per-share chart + table %>
+  <%= render "dashboard/companies/chart_section",
+             title: "1株あたり指標推移",
+             chart_url: chart_data_dashboard_company_path(@company, chart_type: :per_share, scope_type: @summary.scope_type, period_type: @summary.period_type),
+             chart_type: "line",
+             timeline: @summary.timeline,
+             columns: [:eps, :bps],
+             column_labels: { eps: "EPS", bps: "BPS" },
+             format_type: :number %>
+
+  <%# Sector position %>
+  <% sector_position = @summary.get_sector_position %>
+  <% unless sector_position.empty? %>
+    <div class="chart-section">
+      <h3 class="chart-section__title">セクター内ポジション</h3>
+      <div class="sector-positions">
+        <% sector_position.each do |key, data| %>
+          <%= render "dashboard/companies/sector_position",
+                     label: column_label(key),
+                     value: data[:value],
+                     position_data: data[:percentile],
+                     sector_median: data[:sector_median],
+                     format_type: DashboardHelper::PERCENT_FIELDS.include?(key) ? :percent : :ratio %>
+        <% end %>
+      </div>
+    </div>
+  <% end %>
+</turbo-frame>
