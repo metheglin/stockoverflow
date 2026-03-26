@@ -21,6 +21,7 @@ Rails.application.routes.draw do
         get :metrics
         get :quotes
         get :compare
+        get :chart_data
       end
     end
   end
