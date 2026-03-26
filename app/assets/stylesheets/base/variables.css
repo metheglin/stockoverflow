@@ -1,0 +1,81 @@
+:root {
+  /* Dark mode (default) */
+  --color-bg-primary: #0d1117;
+  --color-bg-secondary: #161b22;
+  --color-bg-tertiary: #21262d;
+  --color-bg-hover: #30363d;
+
+  --color-border-primary: #30363d;
+  --color-border-secondary: #21262d;
+
+  --color-text-primary: #e6edf3;
+  --color-text-secondary: #8b949e;
+  --color-text-muted: #6e7681;
+
+  --color-accent-blue: #58a6ff;
+  --color-accent-green: #3fb950;
+  --color-accent-red: #f85149;
+  --color-accent-yellow: #d29922;
+  --color-accent-purple: #bc8cff;
+
+  /* Chart color palette */
+  --chart-color-1: #58a6ff;
+  --chart-color-2: #3fb950;
+  --chart-color-3: #f85149;
+  --chart-color-4: #d29922;
+  --chart-color-5: #bc8cff;
+  --chart-color-6: #f778ba;
+  --chart-grid: rgba(110, 118, 129, 0.3);
+  --chart-text: #8b949e;
+
+  /* Spacing */
+  --spacing-xs: 4px;
+  --spacing-sm: 8px;
+  --spacing-md: 16px;
+  --spacing-lg: 24px;
+  --spacing-xl: 32px;
+
+  /* Fonts */
+  --font-family-base: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans JP", Helvetica, Arial, sans-serif;
+  --font-family-mono: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+  --font-size-xs: 0.75rem;
+  --font-size-sm: 0.875rem;
+  --font-size-base: 1rem;
+  --font-size-lg: 1.125rem;
+  --font-size-xl: 1.25rem;
+
+  /* Border radius */
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+}
+
+/* Light mode */
+[data-theme="light"] {
+  --color-bg-primary: #ffffff;
+  --color-bg-secondary: #f6f8fa;
+  --color-bg-tertiary: #eaeef2;
+  --color-bg-hover: #d0d7de;
+
+  --color-border-primary: #d0d7de;
+  --color-border-secondary: #eaeef2;
+
+  --color-text-primary: #1f2328;
+  --color-text-secondary: #656d76;
+  --color-text-muted: #8b949e;
+
+  --color-accent-blue: #0969da;
+  --color-accent-green: #1a7f37;
+  --color-accent-red: #cf222e;
+  --color-accent-yellow: #9a6700;
+  --color-accent-purple: #8250df;
+
+  --chart-color-1: #0969da;
+  --chart-color-2: #1a7f37;
+  --chart-color-3: #cf222e;
+  --chart-color-4: #9a6700;
+  --chart-color-5: #8250df;
+  --chart-color-6: #bf3989;
+  --chart-grid: rgba(208, 215, 222, 0.5);
+  --chart-text: #656d76;
+}
