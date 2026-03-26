@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_03_25_065540) do
+ActiveRecord::Schema[8.1].define(version: 2026_03_26_090227) do
   create_table "application_properties", force: :cascade do |t|
     t.datetime "created_at", null: false
     t.json "data_json", default: "{}", null: false
@@ -148,6 +148,21 @@ ActiveRecord::Schema[8.1].define(version: 2026_03_25_065540) do
     t.index ["company_id"], name: "index_financial_values_on_company_id"
     t.index ["financial_report_id"], name: "index_financial_values_on_financial_report_id"
     t.index ["fiscal_year_end"], name: "index_financial_values_on_fiscal_year_end"
+  end
+
+  create_table "screening_presets", force: :cascade do |t|
+    t.json "conditions_json", default: {}, null: false
+    t.datetime "created_at", null: false
+    t.text "description"
+    t.json "display_json", default: {}, null: false
+    t.integer "execution_count", default: 0, null: false
+    t.datetime "last_executed_at"
+    t.string "name", null: false
+    t.integer "preset_type", default: 0, null: false
+    t.integer "status", default: 1, null: false
+    t.datetime "updated_at", null: false
+    t.index ["preset_type"], name: "index_screening_presets_on_preset_type"
+    t.index ["status"], name: "index_screening_presets_on_status"
   end
 
   create_table "sector_metrics", force: :cascade do |t|

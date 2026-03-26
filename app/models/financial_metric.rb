@@ -16,6 +16,17 @@ class FinancialMetric < ApplicationRecord
     q3: 3,
   }
 
+  scope :latest_period, -> {
+    where(
+      "financial_metrics.fiscal_year_end = (" \
+        "SELECT MAX(fm2.fiscal_year_end) FROM financial_metrics fm2 " \
+        "WHERE fm2.company_id = financial_metrics.company_id " \
+        "AND fm2.scope = financial_metrics.scope " \
+        "AND fm2.period_type = financial_metrics.period_type" \
+      ")"
+    )
+  }
+
   define_json_attributes :data_json, schema: {
     per: { type: :decimal },
     pbr: { type: :decimal },
