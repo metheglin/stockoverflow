@@ -1,0 +1,69 @@
+ja:
+  metrics:
+    # Growth (YoY)
+    revenue_yoy: "売上高成長率(YoY)"
+    operating_income_yoy: "営業利益成長率(YoY)"
+    ordinary_income_yoy: "経常利益成長率(YoY)"
+    net_income_yoy: "純利益成長率(YoY)"
+    eps_yoy: "EPS成長率(YoY)"
+    # Profitability
+    roe: "ROE(自己資本利益率)"
+    roa: "ROA(総資産利益率)"
+    operating_margin: "営業利益率"
+    ordinary_margin: "経常利益率"
+    net_margin: "純利益率"
+    # Cash Flow
+    free_cf: "フリーキャッシュフロー"
+    operating_cf_positive: "営業CF正"
+    investing_cf_negative: "投資CF負"
+    free_cf_positive: "FCF正"
+    # Consecutive
+    consecutive_revenue_growth: "連続増収期数"
+    consecutive_profit_growth: "連続増益期数"
+    # Valuation
+    per: "PER(株価収益率)"
+    pbr: "PBR(株価純資産倍率)"
+    psr: "PSR(株価売上高倍率)"
+    dividend_yield: "配当利回り"
+    ev_ebitda: "EV/EBITDA"
+    # Financial Health
+    current_ratio: "流動比率"
+    debt_to_equity: "D/Eレシオ"
+    net_debt_to_equity: "ネットD/Eレシオ"
+    # Efficiency
+    asset_turnover: "総資産回転率"
+    gross_margin: "売上総利益率"
+    sga_ratio: "販管費率"
+    # Scores
+    growth_score: "成長スコア"
+    quality_score: "品質スコア"
+    value_score: "バリュースコア"
+    composite_score: "総合スコア"
+    # CAGR
+    revenue_cagr_3y: "売上高CAGR(3年)"
+    revenue_cagr_5y: "売上高CAGR(5年)"
+    operating_income_cagr_3y: "営業利益CAGR(3年)"
+    operating_income_cagr_5y: "営業利益CAGR(5年)"
+    net_income_cagr_3y: "純利益CAGR(3年)"
+    net_income_cagr_5y: "純利益CAGR(5年)"
+    eps_cagr_3y: "EPS CAGR(3年)"
+    eps_cagr_5y: "EPS CAGR(5年)"
+    # Dividend
+    payout_ratio: "配当性向"
+    dividend_growth_rate: "配当成長率"
+    consecutive_dividend_growth: "連続増配期数"
+  company_attributes:
+    sector_17_code: "セクター(17分類)"
+    sector_33_code: "セクター(33分類)"
+    market_code: "市場区分"
+    scale_category: "規模区分"
+  condition_types:
+    metric_range: "指標(数値)"
+    metric_boolean: "指標(フラグ)"
+    data_json_range: "指標(詳細)"
+    company_attribute: "企業属性"
+  operators:
+    gte: "以上"
+    lte: "以下"
+    eq: "等しい"
+    between: "範囲"

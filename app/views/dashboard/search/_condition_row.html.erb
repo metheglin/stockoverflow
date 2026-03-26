@@ -1,0 +1,53 @@
+<div class="condition-row" data-filter-builder-target="conditionRow">
+  <div class="condition-row-fields">
+    <%# Condition type selector %>
+    <select class="form-select form-select-sm condition-type-select"
+            data-action="change->filter-builder#changeConditionType">
+      <option value="">-- 種類を選択 --</option>
+      <% condition_type_options.each do |label, value| %>
+        <option value="<%= value %>"><%= label %></option>
+      <% end %>
+    </select>
+
+    <%# Field selector (populated dynamically based on type) %>
+    <select class="form-select form-select-sm condition-field-select"
+            data-action="change->filter-builder#changeField"
+            style="display:none;">
+      <option value="">-- 指標を選択 --</option>
+    </select>
+
+    <%# Value inputs: metric_range / data_json_range %>
+    <div class="condition-value-inputs condition-range-inputs" style="display:none;">
+      <input type="number" step="any" class="form-input form-input-sm condition-min"
+             placeholder="最小値">
+      <span class="condition-separator">~</span>
+      <input type="number" step="any" class="form-input form-input-sm condition-max"
+             placeholder="最大値">
+    </div>
+
+    <%# Value inputs: metric_boolean %>
+    <div class="condition-value-inputs condition-boolean-inputs" style="display:none;">
+      <select class="form-select form-select-sm condition-boolean-value">
+        <option value="true">はい</option>
+        <option value="false">いいえ</option>
+      </select>
+    </div>
+
+    <%# Value inputs: company_attribute %>
+    <div class="condition-value-inputs condition-attribute-inputs" style="display:none;">
+      <input type="text" class="form-input form-input-sm condition-attribute-value"
+             placeholder="値をカンマ区切りで入力">
+    </div>
+  </div>
+
+  <%# Remove button %>
+  <button class="btn btn-sm btn-icon condition-remove-btn"
+          data-action="filter-builder#removeCondition"
+          title="この条件を削除">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+         stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <line x1="18" y1="6" x2="6" y2="18"></line>
+      <line x1="6" y1="6" x2="18" y2="18"></line>
+    </svg>
+  </button>
+</div>

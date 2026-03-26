@@ -17,9 +17,15 @@ class Dashboard::PresetsController < Dashboard::BaseController
     @preset = ScreeningPreset.new(preset_params)
     @preset.preset_type = :custom
     if @preset.save
-      redirect_to dashboard_preset_path(@preset)
+      respond_to do |format|
+        format.html { redirect_to dashboard_preset_path(@preset) }
+        format.json { render json: preset_as_json(@preset), status: :created }
+      end
     else
-      render :new, status: :unprocessable_entity
+      respond_to do |format|
+        format.html { render :new, status: :unprocessable_entity }
+        format.json { render json: { errors: @preset.errors.full_messages }, status: :unprocessable_entity }
+      end
     end
   end
 
@@ -33,5 +39,15 @@ class Dashboard::PresetsController < Dashboard::BaseController
 
   def preset_params
     params.require(:screening_preset).permit(:name, :description, :conditions_json, :display_json)
+  end
+
+  def preset_as_json(preset)
+    {
+      id: preset.id,
+      name: preset.name,
+      description: preset.description,
+      conditions_json: preset.parsed_conditions,
+      display_json: preset.parsed_display,
+    }
   end
 end

@@ -1,0 +1,5 @@
+<%= turbo_stream.replace "search_results" do %>
+  <%= render "dashboard/search/results_table",
+             results: @results,
+             display_columns: @display_columns %>
+<% end %>

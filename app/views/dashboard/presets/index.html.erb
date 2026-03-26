@@ -1,0 +1,52 @@
+<div class="page-header">
+  <h1 class="page-title">Presets</h1>
+  <p class="page-subtitle">保存されたスクリーニング条件の一覧</p>
+</div>
+
+<div class="section-card">
+  <% if @presets.any? %>
+    <div class="table-container">
+      <table class="table table-striped">
+        <thead>
+          <tr>
+            <th>名前</th>
+            <th>種別</th>
+            <th>説明</th>
+            <th class="cell-numeric">実行回数</th>
+            <th>最終実行</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          <% @presets.each do |preset| %>
+            <tr>
+              <td>
+                <%= link_to preset.name, dashboard_preset_path(preset), class: "text-link" %>
+              </td>
+              <td>
+                <span class="badge badge-<%= preset.builtin? ? 'blue' : 'green' %>">
+                  <%= preset.builtin? ? "ビルトイン" : "カスタム" %>
+                </span>
+              </td>
+              <td class="text-secondary"><%= truncate(preset.description, length: 60) %></td>
+              <td class="cell-numeric"><%= preset.execution_count %></td>
+              <td class="text-secondary">
+                <%= preset.last_executed_at ? l(preset.last_executed_at, format: :short) : "-" rescue preset.last_executed_at&.strftime("%Y-%m-%d %H:%M") || "-" %>
+              </td>
+              <td>
+                <% if preset.custom? %>
+                  <%= button_to "削除", dashboard_preset_path(preset),
+                      method: :delete,
+                      class: "btn btn-sm btn-danger",
+                      data: { turbo_confirm: "このプリセットを削除しますか？" } %>
+                <% end %>
+              </td>
+            </tr>
+          <% end %>
+        </tbody>
+      </table>
+    </div>
+  <% else %>
+    <p class="text-secondary text-center">保存されたプリセットはありません</p>
+  <% end %>
+</div>

@@ -1,11 +1,84 @@
 <div class="page-header">
   <h1 class="page-title">Search</h1>
-  <p class="page-subtitle">Search and screen companies by financial metrics</p>
+  <p class="page-subtitle">条件を指定して企業をスクリーニングします</p>
 </div>
 
-<div class="section-card">
-  <div class="card-header">
-    <h2 class="card-title">Search Filters</h2>
+<div class="section-card"
+     data-controller="filter-builder preset-manager"
+     data-filter-builder-execute-url-value="<%= execute_dashboard_search_index_path %>"
+     data-preset-manager-presets-url-value="<%= dashboard_presets_path %>"
+     data-preset-manager-filter-builder-outlet=".section-card">
+
+  <%# Preset selector %>
+  <div class="preset-toolbar">
+    <div class="preset-toolbar-left">
+      <select class="form-select form-select-sm preset-select"
+              data-preset-manager-target="presetSelect"
+              data-action="change->preset-manager#loadPreset">
+        <option value="">-- プリセット選択 --</option>
+        <% @presets.each do |preset| %>
+          <option value="<%= preset.id %>"
+                  data-conditions="<%= preset.conditions_json.to_json %>"
+                  data-display="<%= preset.display_json.to_json %>">
+            <%= preset.name %>
+          </option>
+        <% end %>
+      </select>
+      <button class="btn btn-sm" data-action="filter-builder#resetAll">
+        条件リセット
+      </button>
+    </div>
+    <div class="preset-toolbar-right">
+      <button class="btn btn-sm" data-action="preset-manager#openSaveModal">
+        保存
+      </button>
+    </div>
   </div>
-  <p class="text-secondary">Search functionality will be implemented in Phase 3.</p>
+
+  <%# Filter conditions area %>
+  <div class="filter-builder" data-filter-builder-target="container">
+    <div class="filter-logic-selector">
+      <label class="form-label">論理演算:</label>
+      <select class="form-select form-select-sm filter-logic-select"
+              data-filter-builder-target="logicSelect">
+        <option value="and">AND (すべて一致)</option>
+        <option value="or">OR (いずれか一致)</option>
+      </select>
+    </div>
+
+    <div class="condition-rows" data-filter-builder-target="conditionRows">
+      <%# Condition rows will be dynamically added here %>
+    </div>
+
+    <div class="filter-actions">
+      <button class="btn btn-sm" data-action="filter-builder#addCondition">
+        + 条件を追加
+      </button>
+    </div>
+  </div>
+
+  <%# Search execution %>
+  <div class="search-actions">
+    <button class="btn btn-primary"
+            data-action="filter-builder#executeSearch"
+            data-filter-builder-target="searchButton">
+      検索実行
+    </button>
+    <span class="search-status" data-filter-builder-target="status"></span>
+  </div>
+
+  <%# Condition row template %>
+  <template data-filter-builder-target="conditionTemplate">
+    <%= render "dashboard/search/condition_row" %>
+  </template>
 </div>
+
+<%# Results area %>
+<turbo-frame id="search_results">
+  <div class="section-card results-placeholder">
+    <p class="text-secondary text-center">条件を指定して「検索実行」をクリックしてください</p>
+  </div>
+</turbo-frame>
+
+<%# Preset save modal %>
+<%= render "dashboard/search/preset_save_modal" %>

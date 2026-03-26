@@ -1,0 +1,24 @@
+<div class="page-header">
+  <h1 class="page-title"><%= @preset.name %></h1>
+  <p class="page-subtitle"><%= @preset.description %></p>
+</div>
+
+<div class="preset-meta section-card">
+  <div class="preset-meta-items">
+    <span class="badge badge-<%= @preset.builtin? ? 'blue' : 'green' %>">
+      <%= @preset.builtin? ? "ビルトイン" : "カスタム" %>
+    </span>
+    <span class="text-secondary">
+      実行回数: <%= @preset.execution_count %>
+    </span>
+    <span class="text-secondary">
+      <%= link_to "検索画面で編集", dashboard_search_index_path, class: "text-link" %>
+    </span>
+  </div>
+</div>
+
+<turbo-frame id="search_results">
+  <%= render "dashboard/search/results_table",
+             results: @results,
+             display_columns: @preset.columns || %w[securities_code name sector_33_name revenue_yoy operating_income_yoy roe composite_score] %>
+</turbo-frame>

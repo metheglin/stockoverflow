@@ -59,6 +59,13 @@
             Search
           <% end %>
 
+          <%= link_to dashboard_presets_path, class: "sidebar-link #{controller_path == 'dashboard/presets' ? 'active' : ''}" do %>
+            <svg class="sidebar-link-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"></path>
+            </svg>
+            Presets
+          <% end %>
+
           <%= link_to dashboard_companies_path, class: "sidebar-link #{controller_path == 'dashboard/companies' ? 'active' : ''}" do %>
             <svg class="sidebar-link-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <rect x="2" y="7" width="20" height="14" rx="2" ry="2"></rect>
