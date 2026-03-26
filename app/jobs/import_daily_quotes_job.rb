@@ -32,6 +32,7 @@ class ImportDailyQuotesJob < ApplicationJob
     to = to_date ? Date.parse(to_date) : Date.current
 
     Company.listed.where.not(securities_code: nil).find_each do |company|
+      company_retried = false
       begin
         quotes = @client.load_daily_quotes(
           code: company.securities_code,
@@ -40,9 +41,16 @@ class ImportDailyQuotesJob < ApplicationJob
         )
         import_quotes(quotes, company: company)
       rescue JquantsApi::SubscriptionRangeError => e
-        from, to = clamp_date_range(from, to, e)
-        handle_subscription_error!(e, context: company.securities_code)
-        retry
+        unless company_retried
+          from, to = clamp_date_range(from, to, e)
+          company_retried = true
+          retry
+        end
+        @stats[:errors] += 1
+        Rails.logger.warn(
+          "[ImportDailyQuotesJob] Subscription range error for #{company.securities_code}: " \
+          "available #{e.available_from} ~ #{e.available_to}, skipping"
+        )
       rescue => e
         @stats[:errors] += 1
         Rails.logger.error(
