@@ -180,6 +180,52 @@ RSpec.describe JquantsApi do
       end
     end
 
+    describe "サブスクリプション範囲エラー" do
+      it "400レスポンスにサブスクリプション範囲メッセージが含まれる場合SubscriptionRangeErrorを発生させる" do
+        error_body = '{"message": "Your subscription covers the following dates: 2024-01-01 ~ 2026-01-01. If you want more data, please check other plans:https://jpx-jquants.com/#dataset"}'
+
+        error_stubs = Faraday::Adapter::Test::Stubs.new
+        error_stubs.get("/v2/equities/bars/daily") do
+          [400, { "Content-Type" => "application/json" }, error_body]
+        end
+
+        error_client = JquantsApi.new(api_key: api_key)
+        error_connection = Faraday.new(url: JquantsApi::BASE_URL) do |conn|
+          conn.headers["x-api-key"] = api_key
+          conn.response :raise_error
+          conn.adapter :test, error_stubs
+        end
+        error_client.instance_variable_set(:@connection, error_connection)
+
+        expect {
+          error_client.load_daily_quotes(code: "72030", from: "20200101", to: "20240131")
+        }.to raise_error(JquantsApi::SubscriptionRangeError) { |e|
+          expect(e.available_from).to eq(Date.new(2024, 1, 1))
+          expect(e.available_to).to eq(Date.new(2026, 1, 1))
+          expect(e.message).to include("2024-01-01")
+        }
+      end
+
+      it "400レスポンスにサブスクリプション範囲メッセージが含まれない場合はFaraday::BadRequestErrorのまま発生させる" do
+        error_stubs = Faraday::Adapter::Test::Stubs.new
+        error_stubs.get("/v2/equities/bars/daily") do
+          [400, { "Content-Type" => "application/json" }, '{"message": "Invalid parameter"}']
+        end
+
+        error_client = JquantsApi.new(api_key: api_key)
+        error_connection = Faraday.new(url: JquantsApi::BASE_URL) do |conn|
+          conn.headers["x-api-key"] = api_key
+          conn.response :raise_error
+          conn.adapter :test, error_stubs
+        end
+        error_client.instance_variable_set(:@connection, error_connection)
+
+        expect {
+          error_client.load_daily_quotes(code: "72030", from: "20240101", to: "20240131")
+        }.to raise_error(Faraday::BadRequestError)
+      end
+    end
+
     describe ".default" do
       it "credentialsのAPIキーでインスタンスを生成できる" do
         skip "credentials not configured" unless Rails.application.credentials.dig(:jquants, :api_key)

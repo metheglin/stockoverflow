@@ -1,5 +1,6 @@
 class ImportDailyQuotesJob < ApplicationJob
   SLEEP_BETWEEN_COMPANIES = 1  # 銘柄間の待機秒数（全件取得モード用）
+  MAX_SUBSCRIPTION_ERRORS = 3  # サブスクリプション範囲エラーの許容回数（超過で中断）
 
   # 株価四本値データを取り込む
   #
@@ -11,6 +12,7 @@ class ImportDailyQuotesJob < ApplicationJob
   def perform(full: false, from_date: nil, to_date: nil, api_key: nil)
     @client = api_key ? JquantsApi.new(api_key: api_key) : JquantsApi.default
     @stats = { imported: 0, skipped: 0, errors: 0 }
+    @subscription_errors = 0
 
     if full
       import_full(from_date: from_date, to_date: to_date)
@@ -26,15 +28,21 @@ class ImportDailyQuotesJob < ApplicationJob
 
   # 全上場企業について銘柄指定で取得
   def import_full(from_date: nil, to_date: nil)
-    from = from_date || "20200101"
-    to = to_date || Date.current.strftime("%Y%m%d")
+    from = from_date ? Date.parse(from_date) : Date.new(2020, 1, 1)
+    to = to_date ? Date.parse(to_date) : Date.current
 
     Company.listed.where.not(securities_code: nil).find_each do |company|
       begin
         quotes = @client.load_daily_quotes(
-          code: company.securities_code, from: from, to: to
+          code: company.securities_code,
+          from: from.strftime("%Y%m%d"),
+          to: to.strftime("%Y%m%d")
         )
         import_quotes(quotes, company: company)
+      rescue JquantsApi::SubscriptionRangeError => e
+        from, to = clamp_date_range(from, to, e)
+        handle_subscription_error!(e, context: company.securities_code)
+        retry
       rescue => e
         @stats[:errors] += 1
         Rails.logger.error(
@@ -53,14 +61,17 @@ class ImportDailyQuotesJob < ApplicationJob
     first_request = true
 
     (start_date..end_date).each do |date|
-      # 土日はスキップ（株式市場は営業日のみ）
       next if date.saturday? || date.sunday?
+      next if @subscription_range && !date.between?(@subscription_range[:from], @subscription_range[:to])
 
       begin
         sleep(SLEEP_BETWEEN_COMPANIES) unless first_request
         first_request = false
         quotes = @client.load_daily_quotes(date: date.strftime("%Y%m%d"))
         import_quotes(quotes)
+      rescue JquantsApi::SubscriptionRangeError => e
+        @subscription_range = { from: e.available_from, to: e.available_to }
+        handle_subscription_error!(e, context: date.iso8601)
       rescue => e
         @stats[:errors] += 1
         Rails.logger.error(
@@ -106,6 +117,46 @@ class ImportDailyQuotesJob < ApplicationJob
     Rails.logger.error(
       "[ImportDailyQuotesJob] Failed to import #{code}/#{data["Date"]}: #{e.message}"
     )
+  end
+
+  # サブスクリプション範囲エラーの処理
+  # エラー回数が上限を超えた場合は例外を発生させてジョブを中断する
+  def handle_subscription_error!(error, context:)
+    @subscription_errors += 1
+    @stats[:errors] += 1
+
+    Rails.logger.warn(
+      "[ImportDailyQuotesJob] Subscription range error " \
+      "(#{@subscription_errors}/#{MAX_SUBSCRIPTION_ERRORS}) " \
+      "for #{context}: available #{error.available_from} ~ #{error.available_to}"
+    )
+
+    if @subscription_errors >= MAX_SUBSCRIPTION_ERRORS
+      raise JquantsApi::SubscriptionRangeError.new(
+        "Aborting: subscription range error occurred #{@subscription_errors} times. " \
+        "Available: #{error.available_from} ~ #{error.available_to}",
+        available_from: error.available_from,
+        available_to: error.available_to
+      )
+    end
+  end
+
+  # 日付範囲をサブスクリプションの利用可能範囲にクランプする
+  #
+  # @param from [Date] 開始日
+  # @param to [Date] 終了日
+  # @param error [JquantsApi::SubscriptionRangeError] サブスクリプション範囲エラー
+  # @return [Array<Date>] クランプ後の [from, to]
+  def clamp_date_range(from, to, error)
+    clamped_from = [from, error.available_from].max
+    clamped_to = [to, error.available_to].min
+
+    Rails.logger.info(
+      "[ImportDailyQuotesJob] Clamping date range: " \
+      "#{from} ~ #{to} -> #{clamped_from} ~ #{clamped_to}"
+    )
+
+    [clamped_from, clamped_to]
   end
 
   # 最終同期日を取得（未設定時は7日前）

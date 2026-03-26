@@ -1,6 +1,20 @@
 class JquantsApi
   BASE_URL = "https://api.jquants.com/v2/"
 
+  # サブスクリプション範囲外のデータをリクエストした際に発生するエラー
+  # APIレスポンスから利用可能な期間を抽出して保持する
+  class SubscriptionRangeError < StandardError
+    attr_reader :available_from, :available_to
+
+    def initialize(message, available_from:, available_to:)
+      @available_from = available_from
+      @available_to = available_to
+      super(message)
+    end
+  end
+
+  SUBSCRIPTION_RANGE_PATTERN = /Your subscription covers the following dates:\s*(\d{4}-\d{2}-\d{2})\s*~\s*(\d{4}-\d{2}-\d{2})/
+
   # CurPerType → FinancialReport.report_type への変換マッピング
   PERIOD_TYPE_MAP = {
     "FY" => "annual",
@@ -184,6 +198,22 @@ class JquantsApi
 
   def get(path, params = {})
     @connection.get(path, params)
+  rescue Faraday::BadRequestError => e
+    raise_if_subscription_range_error(e)
+    raise
+  end
+
+  # 400エラーがサブスクリプション範囲エラーであれば SubscriptionRangeError を発生させる
+  def raise_if_subscription_range_error(error)
+    body = error.response_body.to_s
+    match = body.match(SUBSCRIPTION_RANGE_PATTERN)
+    return unless match
+
+    raise SubscriptionRangeError.new(
+      body,
+      available_from: Date.parse(match[1]),
+      available_to: Date.parse(match[2])
+    )
   end
 
   # 日付文字列をAPIが受け付ける形式に正規化する
