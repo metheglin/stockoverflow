@@ -78,6 +78,19 @@ module DashboardHelper
     fields.map { |f| [I18n.t("company_attributes.#{f}", locale: :ja, default: f.to_s), f.to_s] }
   end
 
+  # フィルタ可能な指標（トレンド分類）のオプション一覧を返す
+  def trend_filter_options
+    fields = ScreeningPreset::ConditionExecutor::TREND_FILTER_FIELDS
+    fields.map { |f| [I18n.t("metrics.#{f}", locale: :ja, default: f.to_s), f.to_s] }
+  end
+
+  # トレンドラベルの選択肢を返す
+  def trend_label_options
+    ScreeningPreset::ConditionExecutor::TREND_LABELS.map do |label|
+      [I18n.t("trend_labels.#{label}", locale: :ja, default: label), label]
+    end
+  end
+
   # 全フィルタ条件タイプのオプション一覧を返す
   def condition_type_options
     [
@@ -85,6 +98,7 @@ module DashboardHelper
       [I18n.t("condition_types.data_json_range", locale: :ja), "data_json_range"],
       [I18n.t("condition_types.metric_boolean", locale: :ja), "metric_boolean"],
       [I18n.t("condition_types.company_attribute", locale: :ja), "company_attribute"],
+      [I18n.t("condition_types.trend_filter", locale: :ja), "trend_filter"],
     ]
   end
 
@@ -125,6 +139,52 @@ module DashboardHelper
     elsif metric.respond_to?(col)
       metric.send(col)
     end
+  end
+
+  TREND_BADGE_CONFIG = {
+    "improving" => { css: "badge-trend-improving", icon: "\u2191", label: "改善" },
+    "deteriorating" => { css: "badge-trend-deteriorating", icon: "\u2193", label: "悪化" },
+    "stable" => { css: "badge-trend-stable", icon: "\u2192", label: "安定" },
+    "turning_up" => { css: "badge-trend-turning-up", icon: "\u2191", label: "転換" },
+    "turning_down" => { css: "badge-trend-turning-down", icon: "\u2193", label: "転換" },
+    "volatile" => { css: "badge-trend-volatile", icon: "\u223C", label: "変動" },
+  }.freeze
+
+  ACCELERATION_CONSISTENCY_LABELS = {
+    "accelerating" => "加速中",
+    "decelerating" => "減速中",
+    "mixed" => "混在",
+  }.freeze
+
+  # トレンドラベルに対応するバッジHTMLを生成する
+  #
+  # @param trend_label [String, nil] トレンドラベル（"improving", "deteriorating"等）
+  # @return [String] バッジのHTML。ラベルがnilの場合は空文字列
+  def trend_badge(trend_label)
+    config = TREND_BADGE_CONFIG[trend_label.to_s]
+    return "" unless config
+
+    tag.span(class: "badge #{config[:css]}") do
+      "#{config[:icon]} #{config[:label]}".html_safe
+    end
+  end
+
+  # 成長加速度の一貫性ラベルを返す
+  #
+  # @param consistency [String, nil] "accelerating" | "decelerating" | "mixed"
+  # @return [String] 日本語ラベル
+  def acceleration_consistency_label(consistency)
+    ACCELERATION_CONSISTENCY_LABELS[consistency.to_s] || "-"
+  end
+
+  # 成長加速度の値をフォーマットする（パーセントポイント表示）
+  #
+  # @param value [Numeric, nil] 加速度の値（小数）
+  # @return [String] フォーマット済み文字列（例: "+5.0pp"）
+  def format_acceleration(value)
+    return "-" if value.nil?
+    pp_value = (value.to_f * 100).round(1)
+    pp_value >= 0 ? "+#{pp_value}pp" : "#{pp_value}pp"
   end
 
   # 金額を読みやすい形式にフォーマット

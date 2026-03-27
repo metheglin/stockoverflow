@@ -52,6 +52,20 @@ ja:
     payout_ratio: "配当性向"
     dividend_growth_rate: "配当成長率"
     consecutive_dividend_growth: "連続増配期数"
+    # Growth Acceleration
+    revenue_growth_acceleration: "売上高成長加速度"
+    operating_income_growth_acceleration: "営業利益成長加速度"
+    net_income_growth_acceleration: "純利益成長加速度"
+    eps_growth_acceleration: "EPS成長加速度"
+    # Trend Classification
+    trend_revenue: "売上高トレンド"
+    trend_operating_income: "営業利益トレンド"
+    trend_net_income: "純利益トレンド"
+    trend_eps: "EPSトレンド"
+    trend_operating_margin: "営業利益率トレンド"
+    trend_roe: "ROEトレンド"
+    trend_roa: "ROAトレンド"
+    trend_free_cf: "フリーCFトレンド"
   company_attributes:
     sector_17_code: "セクター(17分類)"
     sector_33_code: "セクター(33分類)"
@@ -62,6 +76,14 @@ ja:
     metric_boolean: "指標(フラグ)"
     data_json_range: "指標(詳細)"
     company_attribute: "企業属性"
+    trend_filter: "トレンド分類"
+  trend_labels:
+    improving: "改善"
+    deteriorating: "悪化"
+    stable: "安定"
+    turning_up: "上昇転換"
+    turning_down: "下降転換"
+    volatile: "変動"
   operators:
     gte: "以上"
     lte: "以下"

@@ -38,6 +38,16 @@
       <input type="text" class="form-input form-input-sm condition-attribute-value"
              placeholder="値をカンマ区切りで入力">
     </div>
+
+    <%# Value inputs: trend_filter %>
+    <div class="condition-value-inputs condition-trend-inputs" style="display:none;">
+      <select class="form-select form-select-sm condition-trend-value">
+        <option value="">-- トレンドを選択 --</option>
+        <% trend_label_options.each do |label, value| %>
+          <option value="<%= value %>"><%= label %></option>
+        <% end %>
+      </select>
+    </div>
   </div>
 
   <%# Remove button %>

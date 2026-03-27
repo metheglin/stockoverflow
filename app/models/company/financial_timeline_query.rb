@@ -93,6 +93,11 @@ class Company::FinancialTimelineQuery
       result[:pbr] = metric.pbr
       result[:psr] = metric.psr
       result[:dividend_yield] = metric.dividend_yield
+      # 成長加速度
+      result[:revenue_growth_acceleration] = metric.revenue_growth_acceleration
+      result[:operating_income_growth_acceleration] = metric.operating_income_growth_acceleration
+      result[:net_income_growth_acceleration] = metric.net_income_growth_acceleration
+      result[:eps_growth_acceleration] = metric.eps_growth_acceleration
     end
 
     result

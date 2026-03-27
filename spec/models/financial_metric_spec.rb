@@ -1743,4 +1743,209 @@ RSpec.describe FinancialMetric do
       expect(result).to eq({})
     end
   end
+
+  describe ".classify_trend" do
+    it "3期連続改善の場合に improving を返す" do
+      result = FinancialMetric.classify_trend([0.20, 0.15, 0.10])
+
+      expect(result).to eq("improving")
+    end
+
+    it "3期連続悪化の場合に deteriorating を返す" do
+      result = FinancialMetric.classify_trend([0.10, 0.15, 0.20])
+
+      expect(result).to eq("deteriorating")
+    end
+
+    it "変化率が閾値内の場合に stable を返す" do
+      result = FinancialMetric.classify_trend([1.00, 1.02, 1.01])
+
+      expect(result).to eq("stable")
+    end
+
+    it "悪化から改善に転じた場合に turning_up を返す" do
+      result = FinancialMetric.classify_trend([0.20, 0.10, 0.15])
+
+      expect(result).to eq("turning_up")
+    end
+
+    it "改善から悪化に転じた場合に turning_down を返す" do
+      result = FinancialMetric.classify_trend([0.10, 0.20, 0.15])
+
+      expect(result).to eq("turning_down")
+    end
+
+    it "パターンに当てはまらない場合に volatile を返す" do
+      # change_1がthreshold以内、change_2が大幅変化
+      result = FinancialMetric.classify_trend([1.0, 1.02, 0.50])
+
+      expect(result).to eq("volatile")
+    end
+
+    it "データが2期分しかない場合にnilを返す" do
+      result = FinancialMetric.classify_trend([0.20, 0.15])
+
+      expect(result).to be_nil
+    end
+
+    it "データにnilが含まれる場合にnilを返す" do
+      result = FinancialMetric.classify_trend([0.20, nil, 0.10])
+
+      expect(result).to be_nil
+    end
+
+    it "引数がnilの場合にnilを返す" do
+      result = FinancialMetric.classify_trend(nil)
+
+      expect(result).to be_nil
+    end
+
+    it "カスタムの安定閾値を指定できる" do
+      # デフォルト閾値(0.05)では stable だが、0.01では improving
+      result = FinancialMetric.classify_trend([1.05, 1.03, 1.01], stability_threshold: 0.01)
+
+      expect(result).to eq("improving")
+    end
+
+    it "前期値が0の場合にnilを返す（ゼロ除算防止）" do
+      result = FinancialMetric.classify_trend([0.10, 0, 0.05])
+
+      expect(result).to be_nil
+    end
+  end
+
+  describe ".classify_trend_free_cf" do
+    it "フリーCFが3期連続で改善する場合に improving を返す" do
+      result = FinancialMetric.classify_trend_free_cf([300, 200, 100])
+
+      expect(result).to eq("improving")
+    end
+
+    it "フリーCFが3期連続で悪化する場合に deteriorating を返す" do
+      result = FinancialMetric.classify_trend_free_cf([100, 200, 300])
+
+      expect(result).to eq("deteriorating")
+    end
+
+    it "フリーCFがマイナスからプラスに転換する場合に turning_up を返す" do
+      result = FinancialMetric.classify_trend_free_cf([100, -50, 50])
+
+      expect(result).to eq("turning_up")
+    end
+
+    it "3期全てがゼロの場合に stable を返す" do
+      result = FinancialMetric.classify_trend_free_cf([0, 0, 0])
+
+      expect(result).to eq("stable")
+    end
+
+    it "データが不足している場合にnilを返す" do
+      result = FinancialMetric.classify_trend_free_cf([100, 200])
+
+      expect(result).to be_nil
+    end
+  end
+
+  describe ".get_trend_classifications" do
+    it "全指標のトレンド分類を一括算出する" do
+      current = FinancialMetric.new(
+        revenue_yoy: BigDecimal("0.20"),
+        operating_income_yoy: BigDecimal("0.20"),
+        net_income_yoy: BigDecimal("0.20"),
+        eps_yoy: BigDecimal("0.20"),
+        operating_margin: BigDecimal("0.15"),
+        roe: BigDecimal("0.12"),
+        roa: BigDecimal("0.08"),
+        free_cf: 300_000_000,
+      )
+      previous = FinancialMetric.new(
+        revenue_yoy: BigDecimal("0.15"),
+        operating_income_yoy: BigDecimal("0.15"),
+        net_income_yoy: BigDecimal("0.15"),
+        eps_yoy: BigDecimal("0.15"),
+        operating_margin: BigDecimal("0.12"),
+        roe: BigDecimal("0.10"),
+        roa: BigDecimal("0.06"),
+        free_cf: 200_000_000,
+      )
+      two_ago = FinancialMetric.new(
+        revenue_yoy: BigDecimal("0.10"),
+        operating_income_yoy: BigDecimal("0.10"),
+        net_income_yoy: BigDecimal("0.10"),
+        eps_yoy: BigDecimal("0.10"),
+        operating_margin: BigDecimal("0.09"),
+        roe: BigDecimal("0.08"),
+        roa: BigDecimal("0.04"),
+        free_cf: 100_000_000,
+      )
+
+      result = FinancialMetric.get_trend_classifications(current, previous, two_ago)
+
+      expect(result["trend_revenue"]).to eq("improving")
+      expect(result["trend_operating_income"]).to eq("improving")
+      expect(result["trend_net_income"]).to eq("improving")
+      expect(result["trend_eps"]).to eq("improving")
+      expect(result["trend_operating_margin"]).to eq("improving")
+      expect(result["trend_roe"]).to eq("improving")
+      expect(result["trend_roa"]).to eq("improving")
+      expect(result["trend_free_cf"]).to eq("improving")
+    end
+
+    it "前期がnilの場合は空Hashを返す" do
+      current = FinancialMetric.new(revenue_yoy: BigDecimal("0.20"))
+
+      result = FinancialMetric.get_trend_classifications(current, nil, nil)
+
+      expect(result).to eq({})
+    end
+
+    it "前々期がnilの場合は空Hashを返す" do
+      current = FinancialMetric.new(revenue_yoy: BigDecimal("0.20"))
+      previous = FinancialMetric.new(revenue_yoy: BigDecimal("0.15"))
+
+      result = FinancialMetric.get_trend_classifications(current, previous, nil)
+
+      expect(result).to eq({})
+    end
+
+    it "一部の指標がnilの場合はその指標をスキップする" do
+      current = FinancialMetric.new(
+        revenue_yoy: BigDecimal("0.20"),
+        operating_income_yoy: nil,
+        net_income_yoy: BigDecimal("0.20"),
+        eps_yoy: nil,
+        operating_margin: nil,
+        roe: nil,
+        roa: nil,
+        free_cf: nil,
+      )
+      previous = FinancialMetric.new(
+        revenue_yoy: BigDecimal("0.15"),
+        operating_income_yoy: nil,
+        net_income_yoy: BigDecimal("0.15"),
+        eps_yoy: nil,
+        operating_margin: nil,
+        roe: nil,
+        roa: nil,
+        free_cf: nil,
+      )
+      two_ago = FinancialMetric.new(
+        revenue_yoy: BigDecimal("0.10"),
+        operating_income_yoy: nil,
+        net_income_yoy: BigDecimal("0.10"),
+        eps_yoy: nil,
+        operating_margin: nil,
+        roe: nil,
+        roa: nil,
+        free_cf: nil,
+      )
+
+      result = FinancialMetric.get_trend_classifications(current, previous, two_ago)
+
+      expect(result).to have_key("trend_revenue")
+      expect(result).to have_key("trend_net_income")
+      expect(result).not_to have_key("trend_operating_income")
+      expect(result).not_to have_key("trend_eps")
+    end
+  end
 end

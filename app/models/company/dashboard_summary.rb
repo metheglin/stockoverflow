@@ -1,6 +1,6 @@
 class Company::DashboardSummary
   CHART_TYPES = %i[
-    revenue_profit growth_rates profitability cashflow valuation per_share stock_price
+    revenue_profit growth_rates growth_acceleration profitability cashflow valuation per_share stock_price
   ].freeze
 
   QUOTE_PERIODS = {
@@ -55,6 +55,8 @@ class Company::DashboardSummary
       build_revenue_profit_chart
     when :growth_rates
       build_growth_rates_chart
+    when :growth_acceleration
+      build_growth_acceleration_chart
     when :profitability
       build_profitability_chart
     when :cashflow
@@ -154,6 +156,19 @@ class Company::DashboardSummary
         { label: "売上高成長率", data: timeline.map { |t| t[:metrics][:revenue_yoy] } },
         { label: "営業利益成長率", data: timeline.map { |t| t[:metrics][:operating_income_yoy] } },
         { label: "純利益成長率", data: timeline.map { |t| t[:metrics][:net_income_yoy] } },
+      ]
+    }
+  end
+
+  def build_growth_acceleration_chart
+    labels = timeline.map { |t| format_fiscal_label(t[:fiscal_year_end]) }
+    {
+      labels: labels,
+      datasets: [
+        { label: "売上高加速度", data: timeline.map { |t| t[:metrics][:revenue_growth_acceleration] }, type: "bar" },
+        { label: "営業利益加速度", data: timeline.map { |t| t[:metrics][:operating_income_growth_acceleration] }, type: "bar" },
+        { label: "純利益加速度", data: timeline.map { |t| t[:metrics][:net_income_growth_acceleration] }, type: "bar" },
+        { label: "EPS加速度", data: timeline.map { |t| t[:metrics][:eps_growth_acceleration] }, type: "bar" },
       ]
     }
   end

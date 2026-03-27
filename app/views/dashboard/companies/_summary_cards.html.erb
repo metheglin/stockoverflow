@@ -4,7 +4,12 @@
 <div class="metric-grid">
   <%# Revenue / Profit cards %>
   <div class="metric-card">
-    <div class="metric-card-label">売上高</div>
+    <div class="metric-card-label">
+      売上高
+      <% if fm %>
+        <%= trend_badge(fm.trend_revenue) %>
+      <% end %>
+    </div>
     <div class="metric-card-value"><%= format_amount(fv&.net_sales) %></div>
     <% if fm %>
       <div class="metric-card-change <%= value_color_class(fm.revenue_yoy) %>">
@@ -14,7 +19,12 @@
   </div>
 
   <div class="metric-card">
-    <div class="metric-card-label">営業利益</div>
+    <div class="metric-card-label">
+      営業利益
+      <% if fm %>
+        <%= trend_badge(fm.trend_operating_income) %>
+      <% end %>
+    </div>
     <div class="metric-card-value"><%= format_amount(fv&.operating_income) %></div>
     <% if fm %>
       <div class="metric-card-change <%= value_color_class(fm.operating_income_yoy) %>">
@@ -24,7 +34,12 @@
   </div>
 
   <div class="metric-card">
-    <div class="metric-card-label">純利益</div>
+    <div class="metric-card-label">
+      純利益
+      <% if fm %>
+        <%= trend_badge(fm.trend_net_income) %>
+      <% end %>
+    </div>
     <div class="metric-card-value"><%= format_amount(fv&.net_income) %></div>
     <% if fm %>
       <div class="metric-card-change <%= value_color_class(fm.net_income_yoy) %>">
@@ -35,7 +50,12 @@
 
   <%# Profitability / Valuation cards %>
   <div class="metric-card">
-    <div class="metric-card-label">ROE</div>
+    <div class="metric-card-label">
+      ROE
+      <% if fm %>
+        <%= trend_badge(fm.trend_roe) %>
+      <% end %>
+    </div>
     <div class="metric-card-value"><%= format_detail_percent(fm&.roe) %></div>
   </div>
 

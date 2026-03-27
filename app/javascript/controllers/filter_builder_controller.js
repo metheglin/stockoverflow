@@ -44,6 +44,10 @@ const FIELD_OPTIONS = {
     ["配当性向", "payout_ratio"],
     ["配当成長率", "dividend_growth_rate"],
     ["連続増配期数", "consecutive_dividend_growth"],
+    ["売上高成長加速度", "revenue_growth_acceleration"],
+    ["営業利益成長加速度", "operating_income_growth_acceleration"],
+    ["純利益成長加速度", "net_income_growth_acceleration"],
+    ["EPS成長加速度", "eps_growth_acceleration"],
   ],
   metric_boolean: [
     ["営業CF正", "operating_cf_positive"],
@@ -55,6 +59,16 @@ const FIELD_OPTIONS = {
     ["セクター(33分類)", "sector_33_code"],
     ["市場区分", "market_code"],
     ["規模区分", "scale_category"],
+  ],
+  trend_filter: [
+    ["売上高トレンド", "trend_revenue"],
+    ["営業利益トレンド", "trend_operating_income"],
+    ["純利益トレンド", "trend_net_income"],
+    ["EPSトレンド", "trend_eps"],
+    ["営業利益率トレンド", "trend_operating_margin"],
+    ["ROEトレンド", "trend_roe"],
+    ["ROAトレンド", "trend_roa"],
+    ["フリーCFトレンド", "trend_free_cf"],
   ],
 }
 
@@ -243,6 +257,11 @@ export default class extends Controller {
         if (values.length === 0) return null
         return { type: conditionType, field, values }
       }
+      case "trend_filter": {
+        const trendValue = row.querySelector(".condition-trend-value")?.value
+        if (!trendValue) return null
+        return { type: conditionType, field, value: trendValue }
+      }
       default:
         return null
     }
@@ -252,11 +271,13 @@ export default class extends Controller {
     const rangeInputs = row.querySelector(".condition-range-inputs")
     const booleanInputs = row.querySelector(".condition-boolean-inputs")
     const attributeInputs = row.querySelector(".condition-attribute-inputs")
+    const trendInputs = row.querySelector(".condition-trend-inputs")
 
     // Hide all
     rangeInputs.style.display = "none"
     booleanInputs.style.display = "none"
     attributeInputs.style.display = "none"
+    if (trendInputs) trendInputs.style.display = "none"
 
     // Show relevant
     switch (conditionType) {
@@ -269,6 +290,9 @@ export default class extends Controller {
         break
       case "company_attribute":
         attributeInputs.style.display = ""
+        break
+      case "trend_filter":
+        if (trendInputs) trendInputs.style.display = ""
         break
     }
   }
@@ -301,6 +325,11 @@ export default class extends Controller {
         case "company_attribute":
           row.querySelector(".condition-attribute-value").value =
             (condition.values || []).join(", ")
+          break
+        case "trend_filter":
+          if (condition.value) {
+            row.querySelector(".condition-trend-value").value = condition.value
+          }
           break
       }
     }, 0)

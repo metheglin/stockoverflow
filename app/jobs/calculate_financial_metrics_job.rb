@@ -101,6 +101,13 @@ class CalculateFinancialMetricsJob < ApplicationJob
       metric.data_json = (metric.data_json || {}).merge(consistency)
     end
 
+    # トレンド分類: 前期・前々期のMetricからトレンドラベルを算出
+    two_periods_ago_metric = prior_metrics_for_consistency&.first
+    trend_classifications = FinancialMetric.get_trend_classifications(metric, previous_metric, two_periods_ago_metric)
+    if trend_classifications.any?
+      metric.data_json = (metric.data_json || {}).merge(trend_classifications)
+    end
+
     metric.save! if metric.new_record? || metric.changed?
     @stats[:calculated] += 1
   rescue => e

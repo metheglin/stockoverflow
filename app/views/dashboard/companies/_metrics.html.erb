@@ -9,6 +9,34 @@
              column_labels: { revenue_yoy: "売上高YoY", operating_income_yoy: "営業利益YoY", net_income_yoy: "純利益YoY" },
              format_type: :percent %>
 
+  <%# Growth acceleration chart + table %>
+  <%= render "dashboard/companies/chart_section",
+             title: "成長加速度推移",
+             chart_url: chart_data_dashboard_company_path(@company, chart_type: :growth_acceleration, scope_type: @summary.scope_type, period_type: @summary.period_type),
+             chart_type: "bar",
+             timeline: @summary.timeline,
+             columns: [:revenue_growth_acceleration, :operating_income_growth_acceleration, :net_income_growth_acceleration, :eps_growth_acceleration],
+             column_labels: {
+               revenue_growth_acceleration: "売上高加速度",
+               operating_income_growth_acceleration: "営業利益加速度",
+               net_income_growth_acceleration: "純利益加速度",
+               eps_growth_acceleration: "EPS加速度",
+             },
+             format_type: :percent %>
+
+  <%# Acceleration consistency %>
+  <% fm = @summary.latest_financial_metric %>
+  <% if fm&.acceleration_consistency %>
+    <div class="chart-section">
+      <h3 class="chart-section__title">成長加速の一貫性</h3>
+      <div class="acceleration-summary">
+        <span class="badge <%= fm.acceleration_consistency == 'accelerating' ? 'badge-green' : fm.acceleration_consistency == 'decelerating' ? 'badge-red' : 'badge-yellow' %>">
+          <%= acceleration_consistency_label(fm.acceleration_consistency) %>
+        </span>
+      </div>
+    </div>
+  <% end %>
+
   <%# Profitability chart + table %>
   <%= render "dashboard/companies/chart_section",
              title: "収益性指標推移",

@@ -17,7 +17,16 @@ class ScreeningPreset::ConditionExecutor
     revenue_cagr_3y revenue_cagr_5y operating_income_cagr_3y operating_income_cagr_5y
     net_income_cagr_3y net_income_cagr_5y eps_cagr_3y eps_cagr_5y
     payout_ratio dividend_growth_rate consecutive_dividend_growth
+    revenue_growth_acceleration operating_income_growth_acceleration
+    net_income_growth_acceleration eps_growth_acceleration
   ].freeze
+
+  TREND_FILTER_FIELDS = %i[
+    trend_revenue trend_operating_income trend_net_income trend_eps
+    trend_operating_margin trend_roe trend_roa trend_free_cf
+  ].freeze
+
+  TREND_LABELS = FinancialMetric::TREND_LABELS.freeze
 
   COMPANY_ATTRIBUTE_FIELDS = %i[
     sector_17_code sector_33_code market_code scale_category
@@ -108,6 +117,8 @@ class ScreeningPreset::ConditionExecutor
       build_metric_boolean_sql(condition)
     when "company_attribute"
       build_company_attribute_sql(condition)
+    when "trend_filter"
+      nil # trend_filter はpost_filterで処理
     end
   end
 
@@ -207,6 +218,8 @@ class ScreeningPreset::ConditionExecutor
         metrics = apply_metric_top_n(metrics, condition)
       when "preset_ref"
         metrics = apply_preset_ref(metrics, condition, logic: logic, depth: depth)
+      when "trend_filter"
+        metrics = apply_trend_filter(metrics, condition)
       end
     end
 
@@ -243,6 +256,8 @@ class ScreeningPreset::ConditionExecutor
       apply_metric_top_n(metrics, condition)
     when "preset_ref"
       apply_preset_ref(metrics, condition, logic: "and", depth: depth)
+    when "trend_filter"
+      apply_trend_filter(metrics, condition)
     else
       metrics
     end
@@ -306,6 +321,18 @@ class ScreeningPreset::ConditionExecutor
       metrics.select { |m| combined_ids.include?(m.company_id) }
     else
       metrics.select { |m| ref_company_ids.include?(m.company_id) }
+    end
+  end
+
+  def apply_trend_filter(metrics, condition)
+    field = condition[:field]&.to_sym
+    return metrics unless TREND_FILTER_FIELDS.include?(field)
+
+    value = condition[:value]&.to_s
+    return metrics unless TREND_LABELS.include?(value)
+
+    metrics.select do |m|
+      m.respond_to?(field) && m.send(field) == value
     end
   end
 

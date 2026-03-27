@@ -74,6 +74,15 @@ class FinancialMetric < ApplicationRecord
     net_income_growth_acceleration: { type: :decimal },
     eps_growth_acceleration: { type: :decimal },
     acceleration_consistency: { type: :string },
+    # トレンド分類
+    trend_revenue: { type: :string },
+    trend_operating_income: { type: :string },
+    trend_net_income: { type: :string },
+    trend_eps: { type: :string },
+    trend_operating_margin: { type: :string },
+    trend_roe: { type: :string },
+    trend_roa: { type: :string },
+    trend_free_cf: { type: :string },
     # 配当分析
     payout_ratio: { type: :decimal },
     dividend_growth_rate: { type: :decimal },
@@ -391,6 +400,144 @@ class FinancialMetric < ApplicationRecord
     end
 
     result
+  end
+
+  # トレンド分類対象の指標定義
+  # key: data_jsonに格納するときのtrend_*キー, value: 値取得用の属性/メソッド名
+  TREND_TARGETS = {
+    trend_revenue: :revenue_yoy,
+    trend_operating_income: :operating_income_yoy,
+    trend_net_income: :net_income_yoy,
+    trend_eps: :eps_yoy,
+    trend_operating_margin: :operating_margin,
+    trend_roe: :roe,
+    trend_roa: :roa,
+    trend_free_cf: :free_cf,
+  }.freeze
+
+  TREND_LABELS = %w[improving deteriorating stable turning_up turning_down volatile].freeze
+
+  # 指標の履歴データからトレンド分類を判定する
+  #
+  # 直近3期分の値を受け取り、変化の方向と大きさからトレンドラベルを返す。
+  # 正の変化率が閾値を超えていれば「改善」、負であれば「悪化」として判定する。
+  #
+  # @param metric_history [Array<Numeric, nil>] 直近3期分の値（新→旧順: [current, previous, two_periods_ago]）
+  # @param stability_threshold [Float] 変化率がこの範囲内なら stable（デフォルト: 0.05）
+  # @return [String, nil] トレンドラベル。データ不足の場合nil
+  #
+  # 例:
+  #   classify_trend([120, 110, 100])  # => "improving"  (2期連続増加)
+  #   classify_trend([100, 110, 120])  # => "deteriorating" (2期連続減少)
+  #   classify_trend([120, 100, 110])  # => "turning_up" (悪化から改善に転換)
+  #
+  def self.classify_trend(metric_history, stability_threshold: 0.05)
+    return nil unless metric_history.is_a?(Array) && metric_history.size >= 3
+    current, previous, two_periods_ago = metric_history
+    return nil if current.nil? || previous.nil? || two_periods_ago.nil?
+
+    change_1 = compute_change_direction(current, previous)
+    change_2 = compute_change_direction(previous, two_periods_ago)
+    return nil if change_1.nil? || change_2.nil?
+
+    classify_by_changes(change_1, change_2, stability_threshold)
+  end
+
+  # フリーCF用のトレンド分類を判定する
+  #
+  # フリーCFは正負が重要であるため、値そのものの正負変化で判定する。
+  # 値が正方向に向かっていれば improving、負方向なら deteriorating とする。
+  #
+  # @param metric_history [Array<Numeric, nil>] 直近3期分のフリーCF（新→旧順）
+  # @param stability_threshold [Float] 変化率がこの範囲内なら stable
+  # @return [String, nil] トレンドラベル
+  def self.classify_trend_free_cf(metric_history, stability_threshold: 0.05)
+    return nil unless metric_history.is_a?(Array) && metric_history.size >= 3
+    current, previous, two_periods_ago = metric_history
+    return nil if current.nil? || previous.nil? || two_periods_ago.nil?
+
+    # フリーCFは差分の符号で方向性を判定（正方向=改善）
+    diff_1 = current.to_d - previous.to_d
+    diff_2 = previous.to_d - two_periods_ago.to_d
+
+    # 正規化のために絶対値の最大値で除算（ゼロ除算防止）
+    max_abs = [current, previous, two_periods_ago].map { |v| v.to_d.abs }.max
+    return "stable" if max_abs == 0
+
+    change_1 = (diff_1 / max_abs).to_f
+    change_2 = (diff_2 / max_abs).to_f
+
+    classify_by_changes(change_1, change_2, stability_threshold)
+  end
+
+  # 全トレンド指標を一括算出する
+  #
+  # 当期・前期・前々期の3つのFinancialMetricからトレンド分類を算出し、
+  # data_json格納用のHashを返す。
+  #
+  # @param current_metric [FinancialMetric] 当期
+  # @param previous_metric [FinancialMetric, nil] 前期
+  # @param two_periods_ago_metric [FinancialMetric, nil] 前々期
+  # @return [Hash] トレンド分類のHash（data_json格納用）
+  #
+  # 例:
+  #   result = FinancialMetric.get_trend_classifications(current, prev, prev2)
+  #   # => { "trend_revenue" => "improving", "trend_roe" => "turning_up", ... }
+  #
+  def self.get_trend_classifications(current_metric, previous_metric, two_periods_ago_metric)
+    return {} unless current_metric && previous_metric && two_periods_ago_metric
+
+    result = {}
+
+    TREND_TARGETS.each do |trend_key, attr|
+      values = [
+        current_metric.public_send(attr),
+        previous_metric.public_send(attr),
+        two_periods_ago_metric.public_send(attr),
+      ]
+
+      trend = if trend_key == :trend_free_cf
+                classify_trend_free_cf(values)
+              else
+                classify_trend(values)
+              end
+
+      result[trend_key.to_s] = trend if trend
+    end
+
+    result
+  end
+
+  # 2つの値から変化率を算出する（ゼロ除算防止付き）
+  #
+  # @param current [Numeric] 現在の値
+  # @param previous [Numeric] 前の値
+  # @return [Float, nil] 変化率
+  def self.compute_change_direction(current, previous)
+    return nil if previous.to_d == 0
+    ((current.to_d - previous.to_d) / previous.to_d.abs).to_f
+  end
+
+  # 2期分の変化率から分類ラベルを決定する
+  #
+  # @param change_1 [Float] 直近の変化率
+  # @param change_2 [Float] その前の変化率
+  # @param threshold [Float] 安定判定の閾値
+  # @return [String] トレンドラベル
+  def self.classify_by_changes(change_1, change_2, threshold)
+    if change_1 > threshold && change_2 > threshold
+      "improving"
+    elsif change_1 < -threshold && change_2 < -threshold
+      "deteriorating"
+    elsif change_1.abs <= threshold && change_2.abs <= threshold
+      "stable"
+    elsif change_1 > threshold && change_2 < -threshold
+      "turning_up"
+    elsif change_1 < -threshold && change_2 > threshold
+      "turning_down"
+    else
+      "volatile"
+    end
   end
 
   # 成長加速度メトリクスを算出する
