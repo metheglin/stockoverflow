@@ -55,6 +55,7 @@ class ScreeningPreset::ConditionExecutor
 
     metrics = scope.includes(:company).to_a
     metrics = apply_post_filters(metrics, @conditions_json, depth: depth)
+    metrics = apply_temporal_filters(metrics)
     build_results(metrics)
   end
 
@@ -117,8 +118,8 @@ class ScreeningPreset::ConditionExecutor
       build_metric_boolean_sql(condition)
     when "company_attribute"
       build_company_attribute_sql(condition)
-    when "trend_filter"
-      nil # trend_filter はpost_filterで処理
+    when "trend_filter", "temporal"
+      nil # trend_filter, temporal はpost_filterで処理
     end
   end
 
@@ -333,6 +334,41 @@ class ScreeningPreset::ConditionExecutor
 
     metrics.select do |m|
       m.respond_to?(field) && m.send(field) == value
+    end
+  end
+
+  # temporal条件をconditions_jsonから収集し、MultiPeriodConditionEvaluatorで適用
+  def apply_temporal_filters(metrics)
+    temporal_conditions = collect_temporal_conditions(@conditions_json)
+    return metrics if temporal_conditions.empty?
+
+    company_ids = metrics.map(&:company_id)
+    scope_type = @conditions_json[:scope_type] || "consolidated"
+    period_type = @conditions_json[:period_type] || "annual"
+
+    evaluator = ScreeningPreset::MultiPeriodConditionEvaluator.new(
+      company_ids: company_ids,
+      conditions: temporal_conditions,
+      scope_type: scope_type,
+      period_type: period_type
+    )
+    passing_ids = evaluator.execute.to_set
+    metrics.select { |m| passing_ids.include?(m.company_id) }
+  end
+
+  # conditions_json内のtemporal条件を再帰的に収集する
+  def collect_temporal_conditions(node)
+    conditions = node[:conditions]
+    return [] unless conditions.is_a?(Array)
+
+    conditions.flat_map do |condition|
+      if condition[:logic] && condition[:conditions]
+        collect_temporal_conditions(condition)
+      elsif condition[:type]&.to_s == "temporal"
+        [condition]
+      else
+        []
+      end
     end
   end
 

@@ -107,11 +107,11 @@ RSpec.describe DashboardHelper do
   end
 
   describe "#condition_type_options" do
-    it "5種類の条件タイプを返す" do
+    it "6種類の条件タイプを返す" do
       options = helper.condition_type_options
-      expect(options.size).to eq(5)
+      expect(options.size).to eq(6)
       values = options.map(&:last)
-      expect(values).to include("metric_range", "data_json_range", "metric_boolean", "company_attribute", "trend_filter")
+      expect(values).to include("metric_range", "data_json_range", "metric_boolean", "company_attribute", "trend_filter", "temporal")
     end
   end
 

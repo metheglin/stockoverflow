@@ -757,5 +757,114 @@ RSpec.describe ScreeningPreset::ConditionExecutor do
         expect(results.first[:metric]).to be_a(FinancialMetric)
       end
     end
+
+    context "temporal条件" do
+      # company_a に過去期間のメトリクスを追加（5年分の履歴）
+      # ROE: 0.11, 0.12, 0.13, 0.14, 0.125(最新期)
+      # free_cf_positive: true throughout
+      before do
+        [
+          { fiscal_year_end: "2021-03-31", roe: 0.11, operating_margin: 0.10, free_cf_positive: true },
+          { fiscal_year_end: "2022-03-31", roe: 0.12, operating_margin: 0.12, free_cf_positive: true },
+          { fiscal_year_end: "2023-03-31", roe: 0.13, operating_margin: 0.13, free_cf_positive: true },
+          { fiscal_year_end: "2024-03-31", roe: 0.14, operating_margin: 0.14, free_cf_positive: true },
+        ].each do |attrs|
+          fv = FinancialValue.create!(
+            company: company_a,
+            fiscal_year_end: attrs[:fiscal_year_end],
+            scope: :consolidated,
+            period_type: :annual,
+            net_sales: 80_000_000
+          )
+          FinancialMetric.create!(
+            company: company_a,
+            financial_value: fv,
+            fiscal_year_end: attrs[:fiscal_year_end],
+            scope: :consolidated,
+            period_type: :annual,
+            roe: attrs[:roe],
+            operating_margin: attrs[:operating_margin],
+            free_cf_positive: attrs[:free_cf_positive]
+          )
+        end
+
+        # company_b に過去期間のメトリクスを追加
+        # ROE: 0.06, 0.05, 0.08, 0.07, 0.075(最新期)
+        # free_cf_positive: false -> false -> false -> false -> false(最新期)
+        [
+          { fiscal_year_end: "2021-03-31", roe: 0.06, operating_margin: 0.08, free_cf_positive: false },
+          { fiscal_year_end: "2022-03-31", roe: 0.05, operating_margin: 0.09, free_cf_positive: false },
+          { fiscal_year_end: "2023-03-31", roe: 0.08, operating_margin: 0.10, free_cf_positive: false },
+          { fiscal_year_end: "2024-03-31", roe: 0.07, operating_margin: 0.11, free_cf_positive: false },
+        ].each do |attrs|
+          fv = FinancialValue.create!(
+            company: company_b,
+            fiscal_year_end: attrs[:fiscal_year_end],
+            scope: :consolidated,
+            period_type: :annual,
+            net_sales: 40_000_000
+          )
+          FinancialMetric.create!(
+            company: company_b,
+            financial_value: fv,
+            fiscal_year_end: attrs[:fiscal_year_end],
+            scope: :consolidated,
+            period_type: :annual,
+            roe: attrs[:roe],
+            operating_margin: attrs[:operating_margin],
+            free_cf_positive: attrs[:free_cf_positive]
+          )
+        end
+      end
+
+      it "temporal条件と既存条件（metric_range等）の組み合わせで動作する" do
+        executor = described_class.new(
+          conditions_json: {
+            scope_type: "consolidated", period_type: "annual", logic: "and",
+            conditions: [
+              { type: "metric_range", field: "roe", min: 0.05 },
+              {
+                type: "temporal",
+                temporal_type: "at_least_n_of_m",
+                field: "roe",
+                threshold: 0.10,
+                comparison: "gte",
+                n: 4,
+                m: 5
+              }
+            ]
+          }
+        )
+        results = executor.execute
+
+        # company_a: ROE history 0.11,0.12,0.13,0.14,0.125 => 5/5 >= 0.10 => pass
+        # company_b: ROE history 0.06,0.05,0.08,0.07,0.075 => 0/5 >= 0.10 => fail
+        # company_c: no history => fail
+        expect(results.map { |r| r[:company] }).to contain_exactly(company_a)
+      end
+
+      it "temporal条件のみの場合でも動作する" do
+        executor = described_class.new(
+          conditions_json: {
+            scope_type: "consolidated", period_type: "annual", logic: "and",
+            conditions: [
+              {
+                type: "temporal",
+                temporal_type: "consecutive",
+                field: "operating_margin",
+                direction: "improving",
+                n: 3
+              }
+            ]
+          }
+        )
+        results = executor.execute
+
+        # company_a: operating_margin 0.10,0.12,0.13,0.14,0.15 => last 4: 0.12,0.13,0.14,0.15 => 3 consecutive improving => pass
+        # company_b: operating_margin 0.08,0.09,0.10,0.11,0.10 => last 4: 0.09,0.10,0.11,0.10 => 0.11->0.10 not improving => fail
+        # company_c: no history => fail
+        expect(results.map { |r| r[:company] }).to contain_exactly(company_a)
+      end
+    end
   end
 end

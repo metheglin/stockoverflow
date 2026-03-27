@@ -90,6 +90,65 @@ BUILTIN_PRESETS = [
       sort_by: "roe", sort_order: "desc", limit: 100,
     },
   },
+  {
+    name: "安定高ROE（5年中4年以上 ROE > 10%）",
+    description: "直近5年間のうち4年以上でROE10%超を達成している安定高収益企業",
+    conditions_json: {
+      scope_type: "consolidated", period_type: "annual", logic: "and",
+      conditions: [
+        {
+          type: "temporal",
+          temporal_type: "at_least_n_of_m",
+          field: "roe",
+          threshold: 0.10,
+          comparison: "gte",
+          n: 4,
+          m: 5
+        }
+      ]
+    },
+    display_json: {
+      columns: %w[securities_code name sector_33_name roe operating_margin composite_score],
+      sort_by: "roe", sort_order: "desc", limit: 100,
+    },
+  },
+  {
+    name: "営業利益率3年連続改善",
+    description: "営業利益率が3年連続で改善している企業",
+    conditions_json: {
+      scope_type: "consolidated", period_type: "annual", logic: "and",
+      conditions: [
+        {
+          type: "temporal",
+          temporal_type: "improving",
+          field: "operating_margin",
+          n: 3
+        }
+      ]
+    },
+    display_json: {
+      columns: %w[securities_code name sector_33_name operating_margin roe revenue_yoy],
+      sort_by: "operating_margin", sort_order: "desc", limit: 100,
+    },
+  },
+  {
+    name: "フリーCFプラス転換（直近1年）",
+    description: "前期フリーCFマイナスから当期プラスに転換した企業",
+    conditions_json: {
+      scope_type: "consolidated", period_type: "annual", logic: "and",
+      conditions: [
+        {
+          type: "temporal",
+          temporal_type: "transition_positive",
+          field: "free_cf_positive"
+        }
+      ]
+    },
+    display_json: {
+      columns: %w[securities_code name sector_33_name free_cf operating_margin roe],
+      sort_by: "roe", sort_order: "desc", limit: 100,
+    },
+  },
 ].freeze
 
 BUILTIN_PRESETS.each do |preset_data|

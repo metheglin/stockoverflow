@@ -99,6 +99,18 @@ module DashboardHelper
       [I18n.t("condition_types.metric_boolean", locale: :ja), "metric_boolean"],
       [I18n.t("condition_types.company_attribute", locale: :ja), "company_attribute"],
       [I18n.t("condition_types.trend_filter", locale: :ja), "trend_filter"],
+      [I18n.t("condition_types.temporal", locale: :ja, default: "時間軸条件"), "temporal"],
+    ]
+  end
+
+  # 時間軸条件の種別オプション一覧を返す
+  def temporal_type_options
+    [
+      ["N期中M期達成", "at_least_n_of_m"],
+      ["N期連続改善", "improving"],
+      ["N期連続悪化", "deteriorating"],
+      ["プラス転換", "transition_positive"],
+      ["マイナス転換", "transition_negative"],
     ]
   end
 

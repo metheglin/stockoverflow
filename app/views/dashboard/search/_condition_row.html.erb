@@ -48,6 +48,39 @@
         <% end %>
       </select>
     </div>
+
+    <%# Value inputs: temporal %>
+    <div class="condition-value-inputs condition-temporal-inputs" style="display:none;">
+      <select class="form-select form-select-sm condition-temporal-type"
+              data-action="change->filter-builder#changeTemporalType">
+        <option value="">-- 条件種別 --</option>
+        <% temporal_type_options.each do |label, value| %>
+          <option value="<%= value %>"><%= label %></option>
+        <% end %>
+      </select>
+
+      <div class="temporal-threshold-group condition-temporal-sub-inputs" style="display:none;">
+        <select class="form-select form-select-sm condition-temporal-comparison">
+          <option value="gte">以上</option>
+          <option value="lte">以下</option>
+          <option value="gt">超</option>
+          <option value="lt">未満</option>
+        </select>
+        <input type="number" step="any" class="form-input form-input-sm condition-temporal-threshold"
+               placeholder="閾値">
+      </div>
+
+      <div class="temporal-n-group condition-temporal-sub-inputs" style="display:none;">
+        <input type="number" step="1" min="1" class="form-input form-input-sm condition-temporal-n"
+               placeholder="N期">
+      </div>
+
+      <div class="temporal-m-group condition-temporal-sub-inputs" style="display:none;">
+        <span class="condition-separator">/</span>
+        <input type="number" step="1" min="1" class="form-input form-input-sm condition-temporal-m"
+               placeholder="M期中">
+      </div>
+    </div>
   </div>
 
   <%# Remove button %>

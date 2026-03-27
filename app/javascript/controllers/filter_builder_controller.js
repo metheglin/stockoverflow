@@ -70,7 +70,29 @@ const FIELD_OPTIONS = {
     ["ROAトレンド", "trend_roa"],
     ["フリーCFトレンド", "trend_free_cf"],
   ],
+  temporal: [
+    ["ROE(自己資本利益率)", "roe"],
+    ["ROA(総資産利益率)", "roa"],
+    ["営業利益率", "operating_margin"],
+    ["純利益率", "net_margin"],
+    ["売上高成長率(YoY)", "revenue_yoy"],
+    ["営業利益成長率(YoY)", "operating_income_yoy"],
+    ["純利益成長率(YoY)", "net_income_yoy"],
+    ["EPS成長率(YoY)", "eps_yoy"],
+    ["FCF正", "free_cf_positive"],
+    ["営業CF正", "operating_cf_positive"],
+  ],
 }
+
+const TEMPORAL_TYPE_OPTIONS = [
+  ["N期中M期達成", "at_least_n_of_m"],
+  ["N期連続改善", "improving"],
+  ["N期連続悪化", "deteriorating"],
+  ["プラス転換", "transition_positive"],
+  ["マイナス転換", "transition_negative"],
+]
+
+const TEMPORAL_BOOLEAN_FIELDS = ["free_cf_positive", "operating_cf_positive"]
 
 export default class extends Controller {
   static targets = [
@@ -130,9 +152,19 @@ export default class extends Controller {
     this._toggleValueInputs(row, conditionType)
   }
 
-  // When field changes (currently no extra action needed, but hook for future)
-  changeField(_event) {
-    // Placeholder for field-specific behavior
+  // When field changes, update temporal UI if applicable
+  changeField(event) {
+    const row = event.target.closest("[data-filter-builder-target='conditionRow']")
+    const conditionType = row.querySelector(".condition-type-select")?.value
+    if (conditionType === "temporal") {
+      this._updateTemporalInputVisibility(row)
+    }
+  }
+
+  // When temporal type changes, update visible sub-inputs
+  changeTemporalType(event) {
+    const row = event.target.closest("[data-filter-builder-target='conditionRow']")
+    this._updateTemporalInputVisibility(row)
   }
 
   // Reset all conditions
@@ -262,6 +294,29 @@ export default class extends Controller {
         if (!trendValue) return null
         return { type: conditionType, field, value: trendValue }
       }
+      case "temporal": {
+        const temporalType = row.querySelector(".condition-temporal-type")?.value
+        if (!temporalType) return null
+        const condition = { type: "temporal", temporal_type: temporalType, field }
+
+        if (temporalType === "at_least_n_of_m") {
+          const threshold = row.querySelector(".condition-temporal-threshold")?.value
+          const comparison = row.querySelector(".condition-temporal-comparison")?.value
+          const n = row.querySelector(".condition-temporal-n")?.value
+          const m = row.querySelector(".condition-temporal-m")?.value
+          if (!n || !m) return null
+          condition.threshold = parseFloat(threshold || "0")
+          condition.comparison = comparison || "gte"
+          condition.n = parseInt(n, 10)
+          condition.m = parseInt(m, 10)
+        } else if (temporalType === "improving" || temporalType === "deteriorating") {
+          const n = row.querySelector(".condition-temporal-n")?.value
+          if (!n) return null
+          condition.n = parseInt(n, 10)
+        }
+        // transition_positive / transition_negative require no extra params
+        return condition
+      }
       default:
         return null
     }
@@ -272,12 +327,14 @@ export default class extends Controller {
     const booleanInputs = row.querySelector(".condition-boolean-inputs")
     const attributeInputs = row.querySelector(".condition-attribute-inputs")
     const trendInputs = row.querySelector(".condition-trend-inputs")
+    const temporalInputs = row.querySelector(".condition-temporal-inputs")
 
     // Hide all
     rangeInputs.style.display = "none"
     booleanInputs.style.display = "none"
     attributeInputs.style.display = "none"
     if (trendInputs) trendInputs.style.display = "none"
+    if (temporalInputs) temporalInputs.style.display = "none"
 
     // Show relevant
     switch (conditionType) {
@@ -294,7 +351,34 @@ export default class extends Controller {
       case "trend_filter":
         if (trendInputs) trendInputs.style.display = ""
         break
+      case "temporal":
+        if (temporalInputs) temporalInputs.style.display = ""
+        break
     }
+  }
+
+  // Update visibility of temporal sub-inputs based on temporal_type and field selection
+  _updateTemporalInputVisibility(row) {
+    const temporalType = row.querySelector(".condition-temporal-type")?.value
+    const field = row.querySelector(".condition-field-select")?.value
+    const isBooleanField = TEMPORAL_BOOLEAN_FIELDS.includes(field)
+
+    const thresholdGroup = row.querySelector(".temporal-threshold-group")
+    const nGroup = row.querySelector(".temporal-n-group")
+    const mGroup = row.querySelector(".temporal-m-group")
+
+    if (thresholdGroup) thresholdGroup.style.display = "none"
+    if (nGroup) nGroup.style.display = "none"
+    if (mGroup) mGroup.style.display = "none"
+
+    if (temporalType === "at_least_n_of_m" && !isBooleanField) {
+      if (thresholdGroup) thresholdGroup.style.display = ""
+      if (nGroup) nGroup.style.display = ""
+      if (mGroup) mGroup.style.display = ""
+    } else if (temporalType === "improving" || temporalType === "deteriorating") {
+      if (nGroup) nGroup.style.display = ""
+    }
+    // transition_positive / transition_negative need no extra inputs
   }
 
   _restoreConditionRow(row, condition) {
@@ -330,6 +414,34 @@ export default class extends Controller {
           if (condition.value) {
             row.querySelector(".condition-trend-value").value = condition.value
           }
+          break
+        case "temporal":
+          if (condition.temporal_type) {
+            const temporalTypeSelect = row.querySelector(".condition-temporal-type")
+            if (temporalTypeSelect) {
+              temporalTypeSelect.value = condition.temporal_type
+              temporalTypeSelect.dispatchEvent(new Event("change"))
+            }
+          }
+          setTimeout(() => {
+            if (condition.threshold !== undefined) {
+              const el = row.querySelector(".condition-temporal-threshold")
+              if (el) el.value = condition.threshold
+            }
+            if (condition.comparison) {
+              const el = row.querySelector(".condition-temporal-comparison")
+              if (el) el.value = condition.comparison
+            }
+            if (condition.n !== undefined) {
+              const el = row.querySelector(".condition-temporal-n")
+              if (el) el.value = condition.n
+            }
+            if (condition.m !== undefined) {
+              const el = row.querySelector(".condition-temporal-m")
+              if (el) el.value = condition.m
+            }
+            this._updateTemporalInputVisibility(row)
+          }, 0)
           break
       }
     }, 0)
