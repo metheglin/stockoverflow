@@ -1600,4 +1600,147 @@ RSpec.describe FinancialMetric do
       expect(result["dupont_roe"]).to be_within(0.0001).of(-0.05)
     end
   end
+
+  describe ".get_growth_acceleration_metrics" do
+    it "成長加速を正しく算出する（前期YoY=10%, 当期YoY=15%のとき+5.0）" do
+      current_metric = FinancialMetric.new(
+        revenue_yoy: BigDecimal("0.15"),
+        operating_income_yoy: BigDecimal("0.20"),
+        net_income_yoy: BigDecimal("0.18"),
+        eps_yoy: BigDecimal("0.22"),
+      )
+      previous_metric = FinancialMetric.new(
+        revenue_yoy: BigDecimal("0.10"),
+        operating_income_yoy: BigDecimal("0.12"),
+        net_income_yoy: BigDecimal("0.08"),
+        eps_yoy: BigDecimal("0.10"),
+      )
+
+      result = FinancialMetric.get_growth_acceleration_metrics(current_metric, previous_metric)
+
+      expect(result["revenue_growth_acceleration"]).to eq(0.05)
+      expect(result["operating_income_growth_acceleration"]).to eq(0.08)
+      expect(result["net_income_growth_acceleration"]).to eq(0.1)
+      expect(result["eps_growth_acceleration"]).to eq(0.12)
+    end
+
+    it "成長減速を正しく算出する（前期YoY=15%, 当期YoY=10%のとき-5.0）" do
+      current_metric = FinancialMetric.new(
+        revenue_yoy: BigDecimal("0.10"),
+        operating_income_yoy: BigDecimal("0.05"),
+        net_income_yoy: BigDecimal("0.03"),
+        eps_yoy: BigDecimal("0.02"),
+      )
+      previous_metric = FinancialMetric.new(
+        revenue_yoy: BigDecimal("0.15"),
+        operating_income_yoy: BigDecimal("0.20"),
+        net_income_yoy: BigDecimal("0.18"),
+        eps_yoy: BigDecimal("0.22"),
+      )
+
+      result = FinancialMetric.get_growth_acceleration_metrics(current_metric, previous_metric)
+
+      expect(result["revenue_growth_acceleration"]).to eq(-0.05)
+      expect(result["operating_income_growth_acceleration"]).to eq(-0.15)
+      expect(result["net_income_growth_acceleration"]).to eq(-0.15)
+      expect(result["eps_growth_acceleration"]).to eq(-0.2)
+    end
+
+    it "前期または当期のYoYがnilの場合はその指標をスキップする" do
+      current_metric = FinancialMetric.new(
+        revenue_yoy: BigDecimal("0.15"),
+        operating_income_yoy: nil,
+        net_income_yoy: BigDecimal("0.10"),
+        eps_yoy: nil,
+      )
+      previous_metric = FinancialMetric.new(
+        revenue_yoy: BigDecimal("0.10"),
+        operating_income_yoy: BigDecimal("0.12"),
+        net_income_yoy: nil,
+        eps_yoy: BigDecimal("0.08"),
+      )
+
+      result = FinancialMetric.get_growth_acceleration_metrics(current_metric, previous_metric)
+
+      expect(result["revenue_growth_acceleration"]).to eq(0.05)
+      expect(result).not_to have_key("operating_income_growth_acceleration")
+      expect(result).not_to have_key("net_income_growth_acceleration")
+      expect(result).not_to have_key("eps_growth_acceleration")
+    end
+
+    it "previous_metricがnilの場合は空Hashを返す" do
+      current_metric = FinancialMetric.new(revenue_yoy: BigDecimal("0.15"))
+
+      result = FinancialMetric.get_growth_acceleration_metrics(current_metric, nil)
+
+      expect(result).to eq({})
+    end
+
+    it "current_metricがnilの場合は空Hashを返す" do
+      previous_metric = FinancialMetric.new(revenue_yoy: BigDecimal("0.10"))
+
+      result = FinancialMetric.get_growth_acceleration_metrics(nil, previous_metric)
+
+      expect(result).to eq({})
+    end
+  end
+
+  describe ".get_acceleration_consistency" do
+    it "3期連続で加速の場合に accelerating を返す" do
+      current = FinancialMetric.new(data_json: { "revenue_growth_acceleration" => 0.03 })
+      prev1 = FinancialMetric.new(data_json: { "revenue_growth_acceleration" => 0.05 })
+      prev2 = FinancialMetric.new(data_json: { "revenue_growth_acceleration" => 0.02 })
+
+      result = FinancialMetric.get_acceleration_consistency(current, [prev1, prev2])
+
+      expect(result["acceleration_consistency"]).to eq("accelerating")
+    end
+
+    it "3期連続で減速の場合に decelerating を返す" do
+      current = FinancialMetric.new(data_json: { "revenue_growth_acceleration" => -0.03 })
+      prev1 = FinancialMetric.new(data_json: { "revenue_growth_acceleration" => -0.05 })
+      prev2 = FinancialMetric.new(data_json: { "revenue_growth_acceleration" => -0.02 })
+
+      result = FinancialMetric.get_acceleration_consistency(current, [prev1, prev2])
+
+      expect(result["acceleration_consistency"]).to eq("decelerating")
+    end
+
+    it "加速と減速が混在する場合に mixed を返す" do
+      current = FinancialMetric.new(data_json: { "revenue_growth_acceleration" => 0.03 })
+      prev1 = FinancialMetric.new(data_json: { "revenue_growth_acceleration" => -0.02 })
+      prev2 = FinancialMetric.new(data_json: { "revenue_growth_acceleration" => 0.01 })
+
+      result = FinancialMetric.get_acceleration_consistency(current, [prev1, prev2])
+
+      expect(result["acceleration_consistency"]).to eq("mixed")
+    end
+
+    it "期数が不足する場合（1期のみ）は空Hashを返す" do
+      current = FinancialMetric.new(data_json: { "revenue_growth_acceleration" => 0.03 })
+      prev1 = FinancialMetric.new(data_json: { "revenue_growth_acceleration" => 0.05 })
+
+      result = FinancialMetric.get_acceleration_consistency(current, [prev1])
+
+      expect(result).to eq({})
+    end
+
+    it "previous_metricsがnilの場合は空Hashを返す" do
+      current = FinancialMetric.new(data_json: { "revenue_growth_acceleration" => 0.03 })
+
+      result = FinancialMetric.get_acceleration_consistency(current, nil)
+
+      expect(result).to eq({})
+    end
+
+    it "加速度にnilが含まれる場合は空Hashを返す" do
+      current = FinancialMetric.new(data_json: { "revenue_growth_acceleration" => 0.03 })
+      prev1 = FinancialMetric.new(data_json: { "revenue_growth_acceleration" => nil })
+      prev2 = FinancialMetric.new(data_json: { "revenue_growth_acceleration" => 0.02 })
+
+      result = FinancialMetric.get_acceleration_consistency(current, [prev1, prev2])
+
+      expect(result).to eq({})
+    end
+  end
 end

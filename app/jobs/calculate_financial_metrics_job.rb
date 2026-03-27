@@ -86,9 +86,19 @@ class CalculateFinancialMetricsJob < ApplicationJob
       **consecutive,
     )
 
-    json_updates = {}.merge(valuation).merge(ev_ebitda).merge(surprise).merge(financial_health).merge(efficiency).merge(dupont).merge(dividend).merge(cagr).merge(cagr_acceleration).merge(quarterly_yoy)
+    # 成長加速度: metricにYoYが割り当て済みの状態で前期metricと比較
+    growth_acceleration = FinancialMetric.get_growth_acceleration_metrics(metric, previous_metric)
+
+    json_updates = {}.merge(valuation).merge(ev_ebitda).merge(surprise).merge(financial_health).merge(efficiency).merge(dupont).merge(dividend).merge(cagr).merge(cagr_acceleration).merge(quarterly_yoy).merge(growth_acceleration)
     if json_updates.any?
       metric.data_json = (metric.data_json || {}).merge(json_updates)
+    end
+
+    # 加速一貫性: revenue_growth_accelerationがdata_jsonに格納済みの状態で判定
+    prior_metrics_for_consistency = find_previous_metrics(fv, 2)
+    consistency = FinancialMetric.get_acceleration_consistency(metric, prior_metrics_for_consistency)
+    if consistency.any?
+      metric.data_json = (metric.data_json || {}).merge(consistency)
     end
 
     metric.save! if metric.new_record? || metric.changed?
@@ -160,6 +170,20 @@ class CalculateFinancialMetricsJob < ApplicationJob
       fiscal_year_end: fv.fiscal_year_end,
       period_type: prior_period,
     )
+  end
+
+  # 直近N期分の FinancialMetric を検索（fiscal_year_end降順）
+  def find_previous_metrics(fv, count)
+    FinancialMetric
+      .where(
+        company_id: fv.company_id,
+        scope: fv.scope,
+        period_type: fv.period_type,
+      )
+      .where("fiscal_year_end < ?", fv.fiscal_year_end)
+      .order(fiscal_year_end: :desc)
+      .limit(count)
+      .to_a
   end
 
   # FinancialValue に対応する FinancialMetric を検索

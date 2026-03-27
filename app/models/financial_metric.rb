@@ -68,6 +68,12 @@ class FinancialMetric < ApplicationRecord
     cagr_acceleration_operating_income: { type: :decimal },
     cagr_acceleration_net_income: { type: :decimal },
     cagr_acceleration_eps: { type: :decimal },
+    # 成長加速度
+    revenue_growth_acceleration: { type: :decimal },
+    operating_income_growth_acceleration: { type: :decimal },
+    net_income_growth_acceleration: { type: :decimal },
+    eps_growth_acceleration: { type: :decimal },
+    acceleration_consistency: { type: :string },
     # 配当分析
     payout_ratio: { type: :decimal },
     dividend_growth_rate: { type: :decimal },
@@ -385,6 +391,75 @@ class FinancialMetric < ApplicationRecord
     end
 
     result
+  end
+
+  # 成長加速度メトリクスを算出する
+  #
+  # 当期と前期のYoY成長率の差分を算出し、成長の勢いの変化を定量化する。
+  # 正の値は成長加速（YoYが上昇中）、負の値は成長減速を意味する。
+  #
+  # @param current_metric [FinancialMetric] 当期の指標
+  # @param previous_metric [FinancialMetric] 前期の指標
+  # @return [Hash] 成長加速度指標のHash（data_json格納用）
+  #
+  # 例:
+  #   result = FinancialMetric.get_growth_acceleration_metrics(current_metric, previous_metric)
+  #   # => { "revenue_growth_acceleration" => 5.0, "operating_income_growth_acceleration" => -2.0, ... }
+  #
+  def self.get_growth_acceleration_metrics(current_metric, previous_metric)
+    return {} unless current_metric && previous_metric
+
+    targets = {
+      "revenue_growth_acceleration" => :revenue_yoy,
+      "operating_income_growth_acceleration" => :operating_income_yoy,
+      "net_income_growth_acceleration" => :net_income_yoy,
+      "eps_growth_acceleration" => :eps_yoy,
+    }
+
+    result = {}
+
+    targets.each do |key, yoy_attr|
+      current_yoy = current_metric.public_send(yoy_attr)
+      previous_yoy = previous_metric.public_send(yoy_attr)
+      next if current_yoy.nil? || previous_yoy.nil?
+
+      result[key] = (current_yoy.to_d - previous_yoy.to_d).round(4).to_f
+    end
+
+    result
+  end
+
+  # 成長加速の一貫性を判定する
+  #
+  # 直近3期分の revenue_growth_acceleration を確認し、
+  # 全て正なら "accelerating"、全て負なら "decelerating"、混在なら "mixed" を返す。
+  #
+  # @param current_metric [FinancialMetric] 当期の指標（revenue_growth_acceleration計算済み）
+  # @param previous_metrics [Array<FinancialMetric>] 直近2期分の過去指標（fiscal_year_end降順）
+  # @return [Hash] acceleration_consistency指標のHash（data_json格納用）
+  #
+  # 例:
+  #   result = FinancialMetric.get_acceleration_consistency(current_metric, [prev1, prev2])
+  #   # => { "acceleration_consistency" => "accelerating" }
+  #
+  def self.get_acceleration_consistency(current_metric, previous_metrics)
+    return {} unless previous_metrics.is_a?(Array) && previous_metrics.size >= 2
+
+    accelerations = [
+      current_metric.revenue_growth_acceleration,
+      previous_metrics[0]&.revenue_growth_acceleration,
+      previous_metrics[1]&.revenue_growth_acceleration,
+    ]
+
+    return {} if accelerations.any?(&:nil?)
+
+    if accelerations.all? { |a| a > 0 }
+      { "acceleration_consistency" => "accelerating" }
+    elsif accelerations.all? { |a| a < 0 }
+      { "acceleration_consistency" => "decelerating" }
+    else
+      { "acceleration_consistency" => "mixed" }
+    end
   end
 
   # historical_fvsからN年前のFinancialValueを検索する
