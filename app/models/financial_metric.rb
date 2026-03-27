@@ -92,6 +92,16 @@ class FinancialMetric < ApplicationRecord
     quality_score: { type: :decimal },
     value_score: { type: :decimal },
     composite_score: { type: :decimal },
+    # セクター内パーセンタイル
+    sector_percentile_roe: { type: :decimal },
+    sector_percentile_roa: { type: :decimal },
+    sector_percentile_operating_margin: { type: :decimal },
+    sector_percentile_revenue_yoy: { type: :decimal },
+    sector_percentile_per: { type: :decimal },
+    sector_percentile_pbr: { type: :decimal },
+    # 市場全体パーセンタイル
+    market_percentile_roe: { type: :decimal },
+    market_percentile_operating_margin: { type: :decimal },
   }
 
   # 2つの FinancialValue から成長性指標（YoY）を算出する
@@ -1067,4 +1077,41 @@ class FinancialMetric < ApplicationRecord
 
     (numerator.to_d / denominator.to_d).round(4)
   end
+
+  # セクター内での企業のパーセンタイル順位を算出する
+  #
+  # @param company_value [Numeric] 企業の指標値
+  # @param sector_values [Array<Numeric>] セクター内全企業の値
+  # @return [Float, nil] 0.0〜1.0のパーセンタイル値
+  #
+  # 例:
+  #   get_percentile(80, [50, 60, 70, 80, 90, 100])
+  #   # => 0.5 (50%タイル)
+  #
+  def self.get_percentile(company_value, sector_values)
+    return nil if sector_values.empty? || company_value.nil?
+
+    sorted = sector_values.compact.sort
+    return nil if sorted.empty?
+    return 0.5 if sorted.size == 1
+
+    rank = sorted.count { |v| v < company_value }
+    rank.to_f / sorted.size
+  end
+
+  # パーセンタイル算出対象の指標定義
+  # key: data_jsonのパーセンタイルキー名, value: 値取得用の属性名
+  SECTOR_PERCENTILE_TARGETS = {
+    sector_percentile_roe: :roe,
+    sector_percentile_roa: :roa,
+    sector_percentile_operating_margin: :operating_margin,
+    sector_percentile_revenue_yoy: :revenue_yoy,
+    sector_percentile_per: :per,
+    sector_percentile_pbr: :pbr,
+  }.freeze
+
+  MARKET_PERCENTILE_TARGETS = {
+    market_percentile_roe: :roe,
+    market_percentile_operating_margin: :operating_margin,
+  }.freeze
 end

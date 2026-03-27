@@ -37,6 +37,11 @@
     </div>
   <% end %>
 
+  <%# Turning points timeline %>
+  <% if @turning_points&.any? %>
+    <%= render "dashboard/companies/turning_points", turning_points: @turning_points %>
+  <% end %>
+
   <%# Profitability chart + table %>
   <%= render "dashboard/companies/chart_section",
              title: "収益性指標推移",
@@ -79,7 +84,8 @@
                      value: data[:value],
                      position_data: data[:percentile],
                      sector_median: data[:sector_median],
-                     format_type: DashboardHelper::PERCENT_FIELDS.include?(key) ? :percent : :ratio %>
+                     format_type: DashboardHelper::PERCENT_FIELDS.include?(key) ? :percent : :ratio,
+                     exact_percentile: data[:exact_percentile] %>
         <% end %>
       </div>
     </div>

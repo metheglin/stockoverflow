@@ -17,6 +17,7 @@ class Dashboard::CompaniesController < Dashboard::BaseController
       scope_type: scope_type_param,
       period_type: period_type_param
     )
+    @events = FinancialEvent.where(company_id: @company.id).order(fiscal_year_end: :desc).limit(10)
   end
 
   # Turbo Frameで財務データタブを返す
@@ -30,6 +31,7 @@ class Dashboard::CompaniesController < Dashboard::BaseController
   def metrics
     @company = Company.find(params[:id])
     @summary = Company::DashboardSummary.new(company: @company, scope_type: scope_type_param, period_type: period_type_param)
+    @turning_points = TrendTurningPoint.where(company_id: @company.id).order(fiscal_year_end: :desc)
     render partial: "dashboard/companies/metrics"
   end
 

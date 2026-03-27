@@ -18,6 +18,9 @@ class CalculateSectorMetricsJob < ApplicationJob
       calculate_for_classification(:sector_17)
     end
 
+    # パーセンタイルランキング算出（セクター統計算出後に実行）
+    calculate_percentiles
+
     log_result
   end
 
@@ -86,6 +89,78 @@ class CalculateSectorMetricsJob < ApplicationJob
     Rails.logger.error(
       "[CalculateSectorMetricsJob] Failed for #{classification}/#{sector_code}: #{e.message}"
     )
+  end
+
+  # 各企業のパーセンタイルランキングを算出し data_json に格納する
+  def calculate_percentiles
+    # セクター(33業種)単位でパーセンタイル算出
+    sector_grouped = @latest_metrics.group_by { |m| m.company.sector_33_code }
+    sector_grouped.each do |_sector_code, metrics|
+      calculate_sector_percentiles(metrics)
+    end
+
+    # 市場全体でパーセンタイル算出
+    calculate_market_percentiles(@latest_metrics)
+  rescue => e
+    Rails.logger.error(
+      "[CalculateSectorMetricsJob] Percentile calculation failed: #{e.message}"
+    )
+  end
+
+  # セクター内パーセンタイルを算出して各metricのdata_jsonに格納
+  def calculate_sector_percentiles(metrics)
+    FinancialMetric::SECTOR_PERCENTILE_TARGETS.each do |percentile_key, attr|
+      values = metrics.map { |m| get_metric_value(m, attr) }
+      compacted = values.compact.map(&:to_f)
+      next if compacted.empty?
+
+      metrics.each do |metric|
+        company_value = get_metric_value(metric, attr)
+        next if company_value.nil?
+
+        pct = FinancialMetric.get_percentile(company_value.to_f, compacted)
+        next if pct.nil?
+
+        json = (metric.data_json || {}).dup
+        json[percentile_key.to_s] = pct.round(4)
+        metric.data_json = json
+      end
+    end
+
+    metrics.each do |metric|
+      metric.save! if metric.changed?
+    end
+  end
+
+  # 市場全体パーセンタイルを算出して各metricのdata_jsonに格納
+  def calculate_market_percentiles(metrics)
+    FinancialMetric::MARKET_PERCENTILE_TARGETS.each do |percentile_key, attr|
+      values = metrics.map { |m| get_metric_value(m, attr) }
+      compacted = values.compact.map(&:to_f)
+      next if compacted.empty?
+
+      metrics.each do |metric|
+        company_value = get_metric_value(metric, attr)
+        next if company_value.nil?
+
+        pct = FinancialMetric.get_percentile(company_value.to_f, compacted)
+        next if pct.nil?
+
+        json = (metric.data_json || {}).dup
+        json[percentile_key.to_s] = pct.round(4)
+        metric.data_json = json
+      end
+    end
+
+    metrics.each do |metric|
+      metric.save! if metric.changed?
+    end
+  end
+
+  def get_metric_value(metric, attr)
+    metric.public_send(attr)
+  rescue NoMethodError
+    nil
   end
 
   def log_result

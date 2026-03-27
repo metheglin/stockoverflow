@@ -1,0 +1,21 @@
+<%# locals: (events:) %>
+<% if events.any? %>
+  <div class="events-feed">
+    <h3 class="events-feed__title">最近のイベント</h3>
+    <div class="events-feed__list" data-controller="events-feed">
+      <% events.each_with_index do |event, idx| %>
+        <div class="event-item event-<%= event.severity %><%= idx >= 5 ? ' event-item--hidden' : '' %>"
+             <% if idx >= 5 %>data-events-feed-target="hidden" style="display: none;"<% end %>>
+          <span class="event-date"><%= event.fiscal_year_end.strftime("%Y/%m") %></span>
+          <span class="event-badge badge-<%= event.severity %>"><%= event_severity_label(event.severity) %></span>
+          <span class="event-description"><%= event.description || event.event_type.humanize %></span>
+        </div>
+      <% end %>
+      <% if events.size > 5 %>
+        <button class="events-feed__more btn btn-sm" data-action="click->events-feed#showAll">
+          もっと見る (<%= events.size - 5 %>件)
+        </button>
+      <% end %>
+    </div>
+  </div>
+<% end %>

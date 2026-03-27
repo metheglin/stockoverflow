@@ -1948,4 +1948,38 @@ RSpec.describe FinancialMetric do
       expect(result).not_to have_key("trend_eps")
     end
   end
+
+  describe ".get_percentile" do
+    it "正常なケースでパーセンタイルを算出する" do
+      result = FinancialMetric.get_percentile(80, [50, 60, 70, 80, 90, 100])
+      # 80未満: 50,60,70 = 3件, 全6件 → 3/6 = 0.5
+      expect(result).to eq(0.5)
+    end
+
+    it "最小値の場合は0.0を返す" do
+      result = FinancialMetric.get_percentile(10, [10, 20, 30, 40, 50])
+      expect(result).to eq(0.0)
+    end
+
+    it "最大値の場合は1.0未満を返す" do
+      result = FinancialMetric.get_percentile(50, [10, 20, 30, 40, 50])
+      # 50未満: 4件, 全5件 → 4/5 = 0.8
+      expect(result).to eq(0.8)
+    end
+
+    it "空配列の場合はnilを返す" do
+      result = FinancialMetric.get_percentile(100, [])
+      expect(result).to be_nil
+    end
+
+    it "company_valueがnilの場合はnilを返す" do
+      result = FinancialMetric.get_percentile(nil, [10, 20, 30])
+      expect(result).to be_nil
+    end
+
+    it "1社のみの場合は0.5を返す" do
+      result = FinancialMetric.get_percentile(100, [100])
+      expect(result).to eq(0.5)
+    end
+  end
 end

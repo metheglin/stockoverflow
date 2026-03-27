@@ -1,14 +1,19 @@
-<%# locals: (label:, value:, position_data:, sector_median:, format_type: :percent) %>
+<%# locals: (label:, value:, position_data:, sector_median:, format_type: :percent, exact_percentile: nil) %>
 <%
-  # quartile (1-4) をパーセンタイルに変換: Q1=12.5%, Q2=37.5%, Q3=62.5%, Q4=87.5%
-  quartile = position_data.is_a?(Hash) ? position_data[:quartile] : 2
-  percentile_value = case quartile
-                     when 1 then 12.5
-                     when 2 then 37.5
-                     when 3 then 62.5
-                     when 4 then 87.5
-                     else 50.0
-                     end
+  # 正確なパーセンタイル値が利用可能な場合はそれを使用（0.0〜1.0 → 0〜100に変換）
+  # そうでなければquartile (1-4) をパーセンタイルに変換: Q1=12.5%, Q2=37.5%, Q3=62.5%, Q4=87.5%
+  if exact_percentile.present?
+    percentile_value = (exact_percentile * 100).round(1)
+  else
+    quartile = position_data.is_a?(Hash) ? position_data[:quartile] : 2
+    percentile_value = case quartile
+                       when 1 then 12.5
+                       when 2 then 37.5
+                       when 3 then 62.5
+                       when 4 then 87.5
+                       else 50.0
+                       end
+  end
   bar_width = [percentile_value, 100].min
   median_pct = 50
   formatted_value = case format_type
@@ -21,6 +26,7 @@
                      when :ratio then format_detail_ratio(sector_median)
                      else sector_median&.round(2).to_s || "-"
                      end
+  top_pct = (100 - percentile_value).round(0).to_i
 %>
 <div class="sector-position">
   <div class="sector-position__label"><%= label %></div>
@@ -31,5 +37,11 @@
     <div class="sector-position__median-marker" style="left: <%= median_pct %>%"
          title="セクター中央値: <%= formatted_median %>"></div>
   </div>
-  <div class="sector-position__percentile">上位<%= (100 - percentile_value).round(0).to_i %>%</div>
+  <div class="sector-position__percentile">
+    <% if exact_percentile.present? %>
+      上位<%= top_pct %>%
+    <% else %>
+      上位<%= top_pct %>%
+    <% end %>
+  </div>
 </div>

@@ -1,0 +1,33 @@
+<%# locals: (turning_points:) %>
+<% if turning_points.any? %>
+  <div class="chart-section">
+    <h3 class="chart-section__title">転換点タイムライン</h3>
+    <div class="turning-points-timeline">
+      <% turning_points.each do |tp| %>
+        <div class="turning-point-item turning-point-<%= tp.significance %>">
+          <div class="turning-point-item__marker">
+            <% if tp.high? %>
+              <span class="turning-point-icon turning-point-icon--high">!</span>
+            <% else %>
+              <span class="turning-point-icon"></span>
+            <% end %>
+          </div>
+          <div class="turning-point-item__content">
+            <div class="turning-point-item__header">
+              <span class="turning-point-date"><%= tp.fiscal_year_end.strftime("%Y/%m") %></span>
+              <span class="turning-point-pattern badge badge-<%= tp.significance %>">
+                <%= turning_point_pattern_label(tp.pattern_type) %>
+              </span>
+              <span class="turning-point-significance badge-<%= tp.significance %>">
+                <%= turning_point_significance_label(tp.significance) %>
+              </span>
+            </div>
+            <div class="turning-point-item__description">
+              <%= tp.description %>
+            </div>
+          </div>
+        </div>
+      <% end %>
+    </div>
+  </div>
+<% end %>

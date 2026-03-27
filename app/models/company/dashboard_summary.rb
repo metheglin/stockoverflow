@@ -72,9 +72,12 @@ class Company::DashboardSummary
 
   # セクター内相対ポジションを返す
   #
-  # @return [Hash] { metric_key => { value:, sector_mean:, sector_median:, percentile: } }
+  # @return [Hash] { metric_key => { value:, sector_mean:, sector_median:, percentile:, exact_percentile: } }
   def get_sector_position
     return {} unless latest_financial_metric && sector_stats
+
+    # パーセンタイルキー → メトリクスキーの逆引きマップ
+    exact_percentile_map = FinancialMetric::SECTOR_PERCENTILE_TARGETS.invert
 
     position = {}
     target_metrics = %i[roe roa operating_margin revenue_yoy per pbr dividend_yield]
@@ -83,11 +86,16 @@ class Company::DashboardSummary
       stats = sector_stats&.dig(key.to_s)
       next unless value && stats
 
+      # 正確なパーセンタイル値（data_jsonに格納済みの場合）
+      percentile_key = exact_percentile_map.key(key)
+      exact_pct = percentile_key ? latest_financial_metric.public_send(percentile_key) : nil
+
       position[key] = {
         value: value,
         sector_mean: stats["mean"],
         sector_median: stats["median"],
         percentile: SectorMetric.get_relative_position(value, stats),
+        exact_percentile: exact_pct&.to_f,
       }
     end
     position

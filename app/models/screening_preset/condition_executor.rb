@@ -118,8 +118,8 @@ class ScreeningPreset::ConditionExecutor
       build_metric_boolean_sql(condition)
     when "company_attribute"
       build_company_attribute_sql(condition)
-    when "trend_filter", "temporal"
-      nil # trend_filter, temporal はpost_filterで処理
+    when "trend_filter", "temporal", "turning_point"
+      nil # trend_filter, temporal, turning_point はpost_filterで処理
     end
   end
 
@@ -221,6 +221,8 @@ class ScreeningPreset::ConditionExecutor
         metrics = apply_preset_ref(metrics, condition, logic: logic, depth: depth)
       when "trend_filter"
         metrics = apply_trend_filter(metrics, condition)
+      when "turning_point"
+        metrics = apply_turning_point_filter(metrics, condition)
       end
     end
 
@@ -259,6 +261,8 @@ class ScreeningPreset::ConditionExecutor
       apply_preset_ref(metrics, condition, logic: "and", depth: depth)
     when "trend_filter"
       apply_trend_filter(metrics, condition)
+    when "turning_point"
+      apply_turning_point_filter(metrics, condition)
     else
       metrics
     end
@@ -335,6 +339,31 @@ class ScreeningPreset::ConditionExecutor
     metrics.select do |m|
       m.respond_to?(field) && m.send(field) == value
     end
+  end
+
+  # 転換点フィルタ: TrendTurningPointテーブルをJOINして条件適用
+  #
+  # 条件例:
+  # { "type": "turning_point", "pattern_type": "growth_resumption", "significance": "high", "since_months": 12 }
+  def apply_turning_point_filter(metrics, condition)
+    pattern_type = condition[:pattern_type]
+    return metrics if pattern_type.blank?
+
+    company_ids = metrics.map(&:company_id)
+    scope = TrendTurningPoint.where(company_id: company_ids)
+    scope = scope.where(pattern_type: pattern_type)
+
+    if condition[:significance].present?
+      scope = scope.where(significance: condition[:significance])
+    end
+
+    if condition[:since_months].present?
+      since_date = Date.current - condition[:since_months].to_i.months
+      scope = scope.where("fiscal_year_end >= ?", since_date)
+    end
+
+    matching_company_ids = scope.distinct.pluck(:company_id).to_set
+    metrics.select { |m| matching_company_ids.include?(m.company_id) }
   end
 
   # temporal条件をconditions_jsonから収集し、MultiPeriodConditionEvaluatorで適用

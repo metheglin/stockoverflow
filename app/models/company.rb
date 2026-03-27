@@ -20,6 +20,8 @@ class Company < ApplicationRecord
   has_many :financial_values, dependent: :destroy
   has_many :financial_metrics, dependent: :destroy
   has_many :daily_quotes, dependent: :destroy
+  has_many :financial_events, dependent: :destroy
+  has_many :trend_turning_points, dependent: :destroy
 
   scope :listed, -> { where(listed: true) }
 

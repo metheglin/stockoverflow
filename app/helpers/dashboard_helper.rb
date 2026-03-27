@@ -256,6 +256,51 @@ module DashboardHelper
     end
   end
 
+  # イベントのseverityラベルを返す
+  #
+  # @param severity [String] "info", "notable", "critical"
+  # @return [String] 日本語ラベル
+  EVENT_SEVERITY_LABELS = {
+    "info" => "情報",
+    "notable" => "注目",
+    "critical" => "重要",
+  }.freeze
+
+  def event_severity_label(severity)
+    EVENT_SEVERITY_LABELS[severity.to_s] || severity.to_s
+  end
+
+  # 転換点パターンタイプのラベルを返す
+  #
+  # @param pattern_type [String]
+  # @return [String] 日本語ラベル
+  TURNING_POINT_PATTERN_LABELS = {
+    "growth_resumption" => "増収転換",
+    "margin_bottom_reversal" => "利益率底打ち",
+    "free_cf_turnaround" => "FCF黒字化",
+    "roe_reversal" => "ROE反転",
+    "revenue_growth_acceleration" => "成長加速",
+    "valuation_shift" => "バリュエーション変動",
+  }.freeze
+
+  def turning_point_pattern_label(pattern_type)
+    TURNING_POINT_PATTERN_LABELS[pattern_type.to_s] || pattern_type.to_s.humanize
+  end
+
+  # 転換点のsignificanceラベルを返す
+  #
+  # @param significance [String]
+  # @return [String] 日本語ラベル
+  TURNING_POINT_SIGNIFICANCE_LABELS = {
+    "low" => "低",
+    "medium" => "中",
+    "high" => "高",
+  }.freeze
+
+  def turning_point_significance_label(significance)
+    TURNING_POINT_SIGNIFICANCE_LABELS[significance.to_s] || significance.to_s
+  end
+
   private
 
   def format_as_percent(value)

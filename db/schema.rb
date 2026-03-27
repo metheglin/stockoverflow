@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_03_26_090227) do
+ActiveRecord::Schema[8.1].define(version: 2026_03_27_180740) do
   create_table "application_properties", force: :cascade do |t|
     t.datetime "created_at", null: false
     t.json "data_json", default: "{}", null: false
@@ -57,6 +57,22 @@ ActiveRecord::Schema[8.1].define(version: 2026_03_26_090227) do
     t.index ["company_id", "traded_on"], name: "index_daily_quotes_on_company_id_and_traded_on", unique: true
     t.index ["company_id"], name: "index_daily_quotes_on_company_id"
     t.index ["traded_on"], name: "index_daily_quotes_on_traded_on"
+  end
+
+  create_table "financial_events", force: :cascade do |t|
+    t.integer "company_id", null: false
+    t.datetime "created_at", null: false
+    t.json "data_json"
+    t.integer "event_type", null: false
+    t.integer "financial_metric_id", null: false
+    t.date "fiscal_year_end", null: false
+    t.integer "severity", default: 0, null: false
+    t.datetime "updated_at", null: false
+    t.index ["company_id", "event_type", "fiscal_year_end"], name: "idx_fin_events_unique", unique: true
+    t.index ["company_id", "fiscal_year_end"], name: "index_financial_events_on_company_id_and_fiscal_year_end"
+    t.index ["company_id"], name: "index_financial_events_on_company_id"
+    t.index ["event_type", "created_at"], name: "index_financial_events_on_event_type_and_created_at"
+    t.index ["financial_metric_id"], name: "index_financial_events_on_financial_metric_id"
   end
 
   create_table "financial_metrics", force: :cascade do |t|
@@ -178,10 +194,32 @@ ActiveRecord::Schema[8.1].define(version: 2026_03_26_090227) do
     t.index ["classification", "sector_code", "calculated_on"], name: "idx_sector_metrics_unique", unique: true
   end
 
+  create_table "trend_turning_points", force: :cascade do |t|
+    t.integer "company_id", null: false
+    t.datetime "created_at", null: false
+    t.json "data_json"
+    t.integer "financial_metric_id", null: false
+    t.date "fiscal_year_end", null: false
+    t.integer "pattern_type", null: false
+    t.integer "period_type", null: false
+    t.integer "scope", default: 0, null: false
+    t.integer "significance", default: 1, null: false
+    t.datetime "updated_at", null: false
+    t.index ["company_id", "fiscal_year_end"], name: "idx_ttp_company_fy"
+    t.index ["company_id", "pattern_type", "fiscal_year_end", "scope", "period_type"], name: "idx_ttp_unique", unique: true
+    t.index ["company_id"], name: "index_trend_turning_points_on_company_id"
+    t.index ["financial_metric_id"], name: "index_trend_turning_points_on_financial_metric_id"
+    t.index ["pattern_type", "fiscal_year_end"], name: "idx_ttp_pattern_fy"
+  end
+
   add_foreign_key "daily_quotes", "companies"
+  add_foreign_key "financial_events", "companies"
+  add_foreign_key "financial_events", "financial_metrics"
   add_foreign_key "financial_metrics", "companies"
   add_foreign_key "financial_metrics", "financial_values"
   add_foreign_key "financial_reports", "companies"
   add_foreign_key "financial_values", "companies"
   add_foreign_key "financial_values", "financial_reports"
+  add_foreign_key "trend_turning_points", "companies"
+  add_foreign_key "trend_turning_points", "financial_metrics"
 end

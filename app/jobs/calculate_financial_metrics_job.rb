@@ -109,6 +109,10 @@ class CalculateFinancialMetricsJob < ApplicationJob
     end
 
     metric.save! if metric.new_record? || metric.changed?
+
+    # イベント検出: メトリクス保存後に実行（idが必要なため）
+    detect_and_save_events(metric, previous_metric)
+
     @stats[:calculated] += 1
   rescue => e
     @stats[:errors] += 1
@@ -258,6 +262,26 @@ class CalculateFinancialMetricsJob < ApplicationJob
   rescue => e
     Rails.logger.error(
       "[CalculateFinancialMetricsJob] Score calculation failed: #{e.message}"
+    )
+  end
+
+  # イベントを検出して保存する
+  #
+  # ユニーク制約 (company_id, event_type, fiscal_year_end) により冪等性を保証
+  def detect_and_save_events(metric, previous_metric)
+    events = FinancialEvent.detect_events(metric, previous_metric)
+    events.each do |event_attrs|
+      FinancialEvent.find_or_create_by!(
+        company_id: event_attrs[:company_id],
+        event_type: event_attrs[:event_type],
+        fiscal_year_end: event_attrs[:fiscal_year_end],
+      ) do |event|
+        event.assign_attributes(event_attrs)
+      end
+    end
+  rescue => e
+    Rails.logger.error(
+      "[CalculateFinancialMetricsJob] Event detection failed for metric##{metric.id}: #{e.message}"
     )
   end
 

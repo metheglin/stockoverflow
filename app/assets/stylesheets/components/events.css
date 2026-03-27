@@ -1,0 +1,185 @@
+/* Events Feed */
+.events-feed {
+  margin-bottom: var(--spacing-lg);
+}
+
+.events-feed__title {
+  font-size: var(--font-size-lg);
+  font-weight: 600;
+  color: var(--color-text-primary);
+  margin-bottom: var(--spacing-md);
+}
+
+.events-feed__list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+}
+
+.event-item {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-sm) var(--spacing-md);
+  border-radius: var(--radius-md);
+  border-left: 3px solid transparent;
+}
+
+.event-item.event-info {
+  background: var(--color-bg-tertiary);
+  border-left-color: var(--color-text-muted);
+}
+
+.event-item.event-notable {
+  background: rgba(210, 153, 34, 0.1);
+  border-left-color: var(--color-accent-yellow);
+}
+
+.event-item.event-critical {
+  background: rgba(248, 81, 73, 0.1);
+  border-left-color: var(--color-accent-red);
+}
+
+.event-date {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-muted);
+  white-space: nowrap;
+  min-width: 60px;
+}
+
+.event-badge {
+  display: inline-block;
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+  padding: 1px 6px;
+  border-radius: var(--radius-sm);
+  white-space: nowrap;
+}
+
+.badge-info {
+  background: var(--color-bg-hover);
+  color: var(--color-text-secondary);
+}
+
+.badge-notable {
+  background: rgba(210, 153, 34, 0.2);
+  color: var(--color-accent-yellow);
+}
+
+.badge-critical {
+  background: rgba(248, 81, 73, 0.2);
+  color: var(--color-accent-red);
+}
+
+.event-description {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-primary);
+}
+
+.events-feed__more {
+  margin-top: var(--spacing-sm);
+  align-self: flex-start;
+}
+
+/* Turning Points Timeline */
+.turning-points-timeline {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+  position: relative;
+  padding-left: var(--spacing-lg);
+}
+
+.turning-points-timeline::before {
+  content: "";
+  position: absolute;
+  left: 10px;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: var(--color-border-primary);
+}
+
+.turning-point-item {
+  display: flex;
+  gap: var(--spacing-md);
+  position: relative;
+}
+
+.turning-point-item__marker {
+  position: absolute;
+  left: calc(-1 * var(--spacing-lg) + 2px);
+  top: 4px;
+  width: 16px;
+  height: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.turning-point-icon {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--color-accent-blue);
+}
+
+.turning-point-icon--high {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--color-accent-yellow);
+  color: var(--color-bg-primary);
+  font-size: 10px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.turning-point-item__content {
+  flex: 1;
+}
+
+.turning-point-item__header {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  margin-bottom: var(--spacing-xs);
+}
+
+.turning-point-date {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-muted);
+}
+
+.turning-point-pattern {
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+  padding: 1px 6px;
+  border-radius: var(--radius-sm);
+}
+
+.turning-point-significance {
+  font-size: var(--font-size-xs);
+}
+
+.badge-low {
+  background: var(--color-bg-hover);
+  color: var(--color-text-secondary);
+}
+
+.badge-medium {
+  background: rgba(88, 166, 255, 0.2);
+  color: var(--color-accent-blue);
+}
+
+.badge-high {
+  background: rgba(210, 153, 34, 0.2);
+  color: var(--color-accent-yellow);
+}
+
+.turning-point-item__description {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+}
