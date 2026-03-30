@@ -94,6 +94,19 @@ const TEMPORAL_TYPE_OPTIONS = [
 
 const TEMPORAL_BOOLEAN_FIELDS = ["free_cf_positive", "operating_cf_positive"]
 
+// Fields stored as ratios in DB (e.g., 0.10 = 10%) but displayed as percentages in UI.
+// User enters percentage values (e.g., 10 for 10%), which must be divided by 100 before sending.
+const PERCENT_FIELDS = [
+  "revenue_yoy", "operating_income_yoy", "ordinary_income_yoy", "net_income_yoy", "eps_yoy",
+  "roe", "roa", "operating_margin", "ordinary_margin", "net_margin",
+  "gross_margin", "sga_ratio", "dividend_yield", "payout_ratio", "dividend_growth_rate",
+  "revenue_cagr_3y", "revenue_cagr_5y", "operating_income_cagr_3y", "operating_income_cagr_5y",
+  "net_income_cagr_3y", "net_income_cagr_5y", "eps_cagr_3y", "eps_cagr_5y",
+  "asset_turnover", "current_ratio", "debt_to_equity", "net_debt_to_equity",
+  "revenue_growth_acceleration", "operating_income_growth_acceleration",
+  "net_income_growth_acceleration", "eps_growth_acceleration",
+]
+
 export default class extends Controller {
   static targets = [
     "container",
@@ -275,8 +288,9 @@ export default class extends Controller {
         const max = row.querySelector(".condition-max")?.value
         if (!min && !max) return null
         const condition = { type: conditionType, field }
-        if (min) condition.min = parseFloat(min)
-        if (max) condition.max = parseFloat(max)
+        const isPercent = PERCENT_FIELDS.includes(field)
+        if (min) condition.min = isPercent ? parseFloat(min) / 100 : parseFloat(min)
+        if (max) condition.max = isPercent ? parseFloat(max) / 100 : parseFloat(max)
         return condition
       }
       case "metric_boolean": {
@@ -305,7 +319,8 @@ export default class extends Controller {
           const n = row.querySelector(".condition-temporal-n")?.value
           const m = row.querySelector(".condition-temporal-m")?.value
           if (!n || !m) return null
-          condition.threshold = parseFloat(threshold || "0")
+          const isPercent = PERCENT_FIELDS.includes(field)
+          condition.threshold = isPercent ? parseFloat(threshold || "0") / 100 : parseFloat(threshold || "0")
           condition.comparison = comparison || "gte"
           condition.n = parseInt(n, 10)
           condition.m = parseInt(m, 10)
@@ -395,14 +410,16 @@ export default class extends Controller {
 
       switch (condition.type) {
         case "metric_range":
-        case "data_json_range":
+        case "data_json_range": {
+          const isPercent = PERCENT_FIELDS.includes(condition.field)
           if (condition.min !== undefined) {
-            row.querySelector(".condition-min").value = condition.min
+            row.querySelector(".condition-min").value = isPercent ? condition.min * 100 : condition.min
           }
           if (condition.max !== undefined) {
-            row.querySelector(".condition-max").value = condition.max
+            row.querySelector(".condition-max").value = isPercent ? condition.max * 100 : condition.max
           }
           break
+        }
         case "metric_boolean":
           row.querySelector(".condition-boolean-value").value = String(condition.value)
           break
@@ -426,7 +443,8 @@ export default class extends Controller {
           setTimeout(() => {
             if (condition.threshold !== undefined) {
               const el = row.querySelector(".condition-temporal-threshold")
-              if (el) el.value = condition.threshold
+              const isPercent = PERCENT_FIELDS.includes(condition.field)
+              if (el) el.value = isPercent ? condition.threshold * 100 : condition.threshold
             }
             if (condition.comparison) {
               const el = row.querySelector(".condition-temporal-comparison")
