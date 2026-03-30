@@ -1,0 +1,15 @@
+# Bugfixダッシュボード検索
+
+初期データインポートは一通りはおこなっているが、どの条件で検索しても１件もヒットしない。
+
+原因調査し、必要であれば修正して。
+
+■ヒット0件のアクセスログ
+
+```
+Started POST "/dashboard/search/execute" for ::1 at 2026-03-30 15:44:32 +0900
+Processing by Dashboard::SearchController#execute as TURBO_STREAM
+  Parameters: {"conditions_json" => "{\"logic\":\"and\",\"conditions\":[{\"type\":\"metric_range\",\"field\":\"operating_margin\",\"min\":10}]}", "display_json" => "{\"columns\":[\"securities_code\",\"name\",\"sector_33_name\",\"revenue_yoy\",\"operating_income_yoy\",\"roe\",\"composite_score\"],\"sort_by\":\"composite_score\",\"sort_order\":\"desc\",\"limit\":100}"}
+  FinancialMetric Eager Load (11.5ms)  SELECT "financial_metrics"."id" AS t0_r0, "financial_metrics"."company_id" AS t0_r1, "financial_metrics"."consecutive_profit_growth" AS t0_r2, "financial_metrics"."consecutive_revenue_growth" AS t0_r3, "financial_metrics"."created_at" AS t0_r4, "financial_metrics"."data_json" AS t0_r5, "financial_metrics"."eps_yoy" AS t0_r6, "financial_metrics"."financial_value_id" AS t0_r7, "financial_metrics"."fiscal_year_end" AS t0_r8, "financial_metrics"."free_cf" AS t0_r9, "financial_metrics"."free_cf_positive" AS t0_r10, "financial_metrics"."investing_cf_negative" AS t0_r11, "financial_metrics"."net_income_yoy" AS t0_r12, "financial_metrics"."net_margin" AS t0_r13, "financial_metrics"."operating_cf_positive" AS t0_r14, "financial_metrics"."operating_income_yoy" AS t0_r15, "financial_metrics"."operating_margin" AS t0_r16, "financial_metrics"."ordinary_income_yoy" AS t0_r17, "financial_metrics"."ordinary_margin" AS t0_r18, "financial_metrics"."period_type" AS t0_r19, "financial_metrics"."revenue_yoy" AS t0_r20, "financial_metrics"."roa" AS t0_r21, "financial_metrics"."roe" AS t0_r22, "financial_metrics"."scope" AS t0_r23, "financial_metrics"."updated_at" AS t0_r24, "companies"."id" AS t1_r0, "companies"."created_at" AS t1_r1, "companies"."data_json" AS t1_r2, "companies"."edinet_code" AS t1_r3, "companies"."listed" AS t1_r4, "companies"."market_code" AS t1_r5, "companies"."market_name" AS t1_r6, "companies"."name" AS t1_r7, "companies"."name_english" AS t1_r8, "companies"."scale_category" AS t1_r9, "companies"."sector_17_code" AS t1_r10, "companies"."sector_17_name" AS t1_r11, "companies"."sector_33_code" AS t1_r12, "companies"."sector_33_name" AS t1_r13, "companies"."securities_code" AS t1_r14, "companies"."updated_at" AS t1_r15 FROM "financial_metrics" INNER JOIN "companies" ON "companies"."id" = "financial_metrics"."company_id" WHERE "financial_metrics"."scope" = 0 AND "financial_metrics"."period_type" = 0 AND (financial_metrics.fiscal_year_end = (SELECT MAX(fm2.fiscal_year_end) FROM financial_metrics fm2 WHERE fm2.company_id = financial_metrics.company_id AND fm2.scope = financial_metrics.scope AND fm2.period_type = financial_metrics.period_type)) AND "companies"."listed" = TRUE AND (financial_metrics.operating_margin >= 10) ORDER BY financial_metrics.fiscal_year_end DESC LIMIT 100 /*action='execute',application='Project',controller='search'*/
+  ↳ app/models/screening_preset/condition_executor.rb:56:in 'ScreeningPreset::ConditionExecutor#execute'
+```
